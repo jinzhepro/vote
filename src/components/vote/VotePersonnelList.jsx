@@ -132,16 +132,35 @@ export function VotePersonnelList({ department, onBack }) {
               <CardHeader>
                 <CardTitle>快速开始</CardTitle>
                 <CardDescription>
-                  不选择特定人员，直接进入投票界面
+                  随机选择一个未评价的人员开始评价
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => router.push(`/vote/${department}/vote`)}
+                  onClick={() => {
+                    const unevaluatedPersonnel = personnel.filter(
+                      (person) => !userEvaluations[person.id]
+                    );
+
+                    if (unevaluatedPersonnel.length > 0) {
+                      const randomIndex = Math.floor(
+                        Math.random() * unevaluatedPersonnel.length
+                      );
+                      const randomPerson = unevaluatedPersonnel[randomIndex];
+                      router.push(`/vote/${department}/${randomPerson.id}`);
+                    } else {
+                      // 如果所有人员都已评价，随机选择一个
+                      const randomIndex = Math.floor(
+                        Math.random() * personnel.length
+                      );
+                      const randomPerson = personnel[randomIndex];
+                      router.push(`/vote/${department}/${randomPerson.id}`);
+                    }
+                  }}
                 >
-                  进入投票界面
+                  随机开始评价
                 </Button>
               </CardContent>
             </Card>

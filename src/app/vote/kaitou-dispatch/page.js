@@ -1,6 +1,6 @@
 "use client";
 
-import { EvaluationVote } from "@/components/vote/EvaluationVote";
+import { VotePersonnelList } from "@/components/vote/VotePersonnelList";
 import { useRouter } from "next/navigation";
 
 export default function KaitouDispatchVotePage() {
@@ -10,11 +10,5 @@ export default function KaitouDispatchVotePage() {
     router.push("/");
   };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-7xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <EvaluationVote department="kaitou-dispatch" onBack={handleBack} />
-      </main>
-    </div>
-  );
+  return <VotePersonnelList department="kaitou-dispatch" onBack={handleBack} />;
 }
