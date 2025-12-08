@@ -32,6 +32,22 @@ export default function Home() {
           >
             参与投票
           </Link>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="bg-white px-2 text-gray-500">管理</span>
+            </div>
+          </div>
+
+          <Link
+            href="/staff"
+            className="flex w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 font-medium transition-colors hover:bg-gray-50"
+          >
+            人员管理
+          </Link>
         </div>
 
         <div className="text-center">
