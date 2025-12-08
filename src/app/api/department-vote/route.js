@@ -148,6 +148,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const department = searchParams.get("department");
+    const userId = searchParams.get("userId");
 
     if (!department) {
       return NextResponse.json(
@@ -159,10 +160,26 @@ export async function GET(request) {
     const votes = await redis.hgetall(`votes:${department}`);
     const criteria = await redis.hgetall(`criteria:${department}`);
 
+    // 获取用户评价历史（如果提供了userId）
+    let userEvaluations = {};
+    if (userId) {
+      userEvaluations = await redis.hgetall(`user_evaluations:${department}`);
+      // 过滤出当前用户的评价
+      const currentUserEvaluations = {};
+      Object.entries(userEvaluations).forEach(([key, evaluation]) => {
+        if (key.startsWith(`${userId}:`)) {
+          const personId = key.split(":")[1];
+          currentUserEvaluations[personId] = evaluation;
+        }
+      });
+      userEvaluations = currentUserEvaluations;
+    }
+
     return NextResponse.json({
       success: true,
       votes: votes || {},
       criteria: criteria || evaluationCriteria,
+      userEvaluations: userEvaluations || {},
     });
   } catch (error) {
     console.error("获取投票失败:", error);
@@ -176,7 +193,7 @@ export async function GET(request) {
 // 提交投票
 export async function POST(request) {
   try {
-    const { department, personId, evaluations } = await request.json();
+    const { department, personId, evaluations, userId } = await request.json();
 
     if (!department || !personId || !evaluations) {
       return NextResponse.json(
@@ -211,6 +228,9 @@ export async function POST(request) {
       0
     );
 
+    // 生成用户ID（如果没有提供）
+    const currentUserId = userId || request.ip || "anonymous";
+
     // 存储投票结果
     const voteData = {
       personId,
@@ -218,6 +238,7 @@ export async function POST(request) {
       totalScore,
       timestamp: new Date().toISOString(),
       ip: request.ip || "unknown",
+      userId: currentUserId,
     };
 
     await redis.hset(
@@ -228,6 +249,18 @@ export async function POST(request) {
 
     // 记录投票历史
     await redis.lpush(`vote_history:${department}`, voteData);
+
+    // 记录用户评价历史 - 使用用户ID作为键
+    await redis.hset(
+      `user_evaluations:${department}`,
+      `${currentUserId}:${personId}`,
+      {
+        personId,
+        evaluations,
+        totalScore,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     // 获取更新后的投票结果
     const updatedVotes = await redis.hgetall(`votes:${department}`);
@@ -262,6 +295,7 @@ export async function DELETE(request) {
 
     await redis.del(`votes:${department}`);
     await redis.del(`vote_history:${department}`);
+    await redis.del(`user_evaluations:${department}`);
 
     return NextResponse.json({
       success: true,

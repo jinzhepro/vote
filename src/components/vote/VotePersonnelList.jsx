@@ -14,7 +14,39 @@ import {
 export function VotePersonnelList({ department, onBack }) {
   const router = useRouter();
   const [personnel, setPersonnel] = useState([]);
+  const [userEvaluations, setUserEvaluations] = useState({});
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState("");
+
+  // 初始化用户ID
+  const initializeUserId = () => {
+    let storedUserId = localStorage.getItem(`userId_${department}`);
+    if (!storedUserId) {
+      // 生成一个简单的用户ID（基于时间戳和随机数）
+      storedUserId = `user_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      localStorage.setItem(`userId_${department}`, storedUserId);
+    }
+    setUserId(storedUserId);
+    return storedUserId;
+  };
+
+  // 获取用户评价历史
+  const fetchUserEvaluations = async () => {
+    try {
+      const currentUserId = userId || initializeUserId();
+      const response = await fetch(
+        `/api/department-vote?department=${department}&userId=${currentUserId}`
+      );
+      const data = await response.json();
+      if (data.success) {
+        setUserEvaluations(data.userEvaluations || {});
+      }
+    } catch (error) {
+      console.error("获取用户评价历史失败:", error);
+    }
+  };
 
   // 获取部门人员
   const fetchPersonnel = async () => {
@@ -44,7 +76,9 @@ export function VotePersonnelList({ department, onBack }) {
   };
 
   useEffect(() => {
+    initializeUserId();
     fetchPersonnel();
+    fetchUserEvaluations();
   }, [department]);
 
   const getDepartmentName = () => {
@@ -116,7 +150,15 @@ export function VotePersonnelList({ department, onBack }) {
           {/* 人员统计 */}
           <div className="flex items-center gap-4 text-sm text-gray-500">
             <span>共 {personnel.length} 人</span>
-            <Button variant="outline" size="sm" onClick={fetchPersonnel}>
+            <span>已评价 {Object.keys(userEvaluations).length} 人</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                fetchPersonnel();
+                fetchUserEvaluations();
+              }}
+            >
               刷新
             </Button>
           </div>
@@ -130,45 +172,73 @@ export function VotePersonnelList({ department, onBack }) {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {personnel.map((person) => (
-                <Card
-                  key={person.id}
-                  className="hover:shadow-md transition-shadow"
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <CardTitle className="text-lg">{person.name}</CardTitle>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(
-                          person.type
-                        )}`}
-                      >
-                        {person.type}
-                      </span>
-                    </div>
-                    <CardDescription className="text-sm">
-                      {person.department}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2 text-xs text-gray-500 mb-4">
-                      <div>ID: {person.id}</div>
-                      <div>
-                        创建时间:{" "}
-                        {new Date(person.createdAt).toLocaleString("zh-CN")}
+              {personnel.map((person) => {
+                const hasEvaluated = userEvaluations[person.id];
+                const evaluation = userEvaluations[person.id];
+                return (
+                  <Card
+                    key={person.id}
+                    className={`hover:shadow-md transition-shadow ${
+                      hasEvaluated ? "border-green-200 bg-green-50" : ""
+                    }`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {person.name}
+                          {hasEvaluated && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✓ 已评价
+                            </span>
+                          )}
+                        </CardTitle>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(
+                            person.type
+                          )}`}
+                        >
+                          {person.type}
+                        </span>
                       </div>
-                    </div>
-                    <Button
-                      className="w-full"
-                      onClick={() =>
-                        router.push(`/vote/${department}/${person.id}`)
-                      }
-                    >
-                      开始评价
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+                      <CardDescription className="text-sm">
+                        {person.department}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2 text-xs text-gray-500 mb-4">
+                        <div>ID: {person.id}</div>
+                        <div>
+                          创建时间:{" "}
+                          {new Date(person.createdAt).toLocaleString("zh-CN")}
+                        </div>
+                        {hasEvaluated && (
+                          <div className="text-green-700 font-medium">
+                            评价时间:{" "}
+                            {new Date(evaluation.timestamp).toLocaleString(
+                              "zh-CN"
+                            )}
+                          </div>
+                        )}
+                        {hasEvaluated && (
+                          <div className="text-green-700 font-medium">
+                            我的评分: {evaluation.totalScore}分
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        className={`w-full ${
+                          hasEvaluated ? "bg-green-600 hover:bg-green-700" : ""
+                        }`}
+                        onClick={() =>
+                          router.push(`/vote/${department}/${person.id}`)
+                        }
+                      >
+                        {hasEvaluated ? "查看评价" : "开始评价"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
