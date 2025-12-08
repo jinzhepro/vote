@@ -341,3 +341,79 @@ export async function PUT(request) {
     );
   }
 }
+
+// 获取所有系统的统计数据
+export async function PATCH() {
+  try {
+    const departments = ["jingkong", "kaitou", "kaitou-dispatch"];
+    const allStats = {};
+
+    for (const dept of departments) {
+      const votes = await redis.hgetall(`votes:${dept}`);
+      const userEvaluations = await redis.hgetall(`user_evaluations:${dept}`);
+
+      // 统计每个部门的评价数据
+      const personStats = {};
+      const results = Object.values(votes || {});
+
+      results.forEach((vote) => {
+        const personId = vote.personId;
+        if (!personStats[personId]) {
+          personStats[personId] = {
+            personId,
+            count: 0,
+            totalScore: 0,
+            averageScore: 0,
+            evaluations: {},
+          };
+        }
+
+        personStats[personId].count++;
+        personStats[personId].totalScore += vote.totalScore;
+
+        // 统计各项评分
+        Object.entries(vote.evaluations).forEach(([criterion, score]) => {
+          if (!personStats[personId].evaluations[criterion]) {
+            personStats[personId].evaluations[criterion] = {
+              total: 0,
+              count: 0,
+            };
+          }
+          personStats[personId].evaluations[criterion].total += score;
+          personStats[personId].evaluations[criterion].count++;
+        });
+      });
+
+      // 计算平均分
+      Object.values(personStats).forEach((stat) => {
+        stat.averageScore = stat.totalScore / stat.count;
+        Object.values(stat.evaluations).forEach((evalStat) => {
+          evalStat.average = evalStat.total / evalStat.count;
+        });
+      });
+
+      allStats[dept] = {
+        totalVotes: results.length,
+        totalEvaluations: Object.keys(userEvaluations || {}).length,
+        personStats,
+        departmentName:
+          {
+            jingkong: "经控贸易",
+            kaitou: "开投贸易",
+            "kaitou-dispatch": "开投贸易派遣",
+          }[dept] || dept,
+      };
+    }
+
+    return NextResponse.json({
+      success: true,
+      stats: allStats,
+    });
+  } catch (error) {
+    console.error("获取统计数据失败:", error);
+    return NextResponse.json(
+      { success: false, error: "获取统计数据失败" },
+      { status: 500 }
+    );
+  }
+}

@@ -94,6 +94,12 @@ export default function Home() {
                 <Button asChild variant="outline">
                   <Link href="/personnel">人员管理</Link>
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => (window.location.href = "/vote/stats")}
+                >
+                  查看统计
+                </Button>
               </div>
             </CardContent>
           </Card>
