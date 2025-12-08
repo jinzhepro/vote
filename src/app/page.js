@@ -40,21 +40,12 @@ export default function Home() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex min-h-screen w-full max-w-7xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
         <div className="w-full">
-          <Image
-            className="dark:invert"
-            src="/next.svg"
-            alt="Next.js logo"
-            width={100}
-            height={20}
-            priority
-          />
-
-          <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left w-full mt-8">
-            <h1 className="text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-              人员评价系统
+          <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left w-full">
+            <h1 className="text-4xl font-bold leading-10 tracking-tight text-black dark:text-zinc-50">
+              2025年度员工绩效考核
             </h1>
             <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-              选择部门进入对应的人员评价投票系统。
+              选择部门进入对应的人员评价系统。
             </p>
           </div>
         </div>
@@ -103,34 +94,6 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <Button asChild>
-            <a
-              href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Image
-                className="dark:invert mr-2"
-                src="/vercel.svg"
-                alt="Vercel logomark"
-                width={16}
-                height={16}
-              />
-              部署到 Vercel
-            </a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a
-              href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              文档
-            </a>
-          </Button>
         </div>
       </main>
     </div>
