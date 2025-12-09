@@ -10,91 +10,76 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LoadingPageModern } from "@/components/ui/loading";
+import { getPersonnelByDepartment } from "@/data/personnelData";
+import { getDeviceId } from "@/lib/deviceId";
 
-export function VotePersonnelList({ department, onBack }) {
+export function VotePersonnelList({ department, role = "employee", onBack }) {
   const router = useRouter();
   const [personnel, setPersonnel] = useState([]);
   const [userEvaluations, setUserEvaluations] = useState({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState("");
 
-  // 初始化用户ID
-  const initializeUserId = () => {
-    let storedUserId = localStorage.getItem(`userId_${department}`);
-    if (!storedUserId) {
-      // 生成一个简单的用户ID（基于时间戳和随机数）
-      storedUserId = `user_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      localStorage.setItem(`userId_${department}`, storedUserId);
-    }
-    setUserId(storedUserId);
-    return storedUserId;
+  // 初始化设备ID
+  const initializeDeviceId = () => {
+    const isLeader = role === "leader";
+    const deviceId = getDeviceId(isLeader);
+    setUserId(deviceId);
+    return deviceId;
   };
 
-  // 获取用户评价历史
-  const fetchUserEvaluations = async () => {
-    try {
-      const currentUserId = userId || initializeUserId();
-      const response = await fetch(
-        `/api/department-vote?department=${department}&userId=${currentUserId}`
-      );
-      const data = await response.json();
-      if (data.success) {
-        setUserEvaluations(data.userEvaluations || {});
+  // 获取设备评价历史（从localStorage）
+  const fetchDeviceEvaluations = () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const storageKey = `evaluations_${department}_${currentDeviceId}`;
+    const storedEvaluations = localStorage.getItem(storageKey);
+    if (storedEvaluations) {
+      try {
+        setUserEvaluations(JSON.parse(storedEvaluations));
+      } catch (error) {
+        console.error("解析评价历史失败:", error);
+        setUserEvaluations({});
       }
-    } catch (error) {
-      console.error("获取用户评价历史失败:", error);
+    } else {
+      setUserEvaluations({});
     }
   };
 
-  // 获取部门人员
+  // 获取部门人员（从 Supabase 或本地数据）
   const fetchPersonnel = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/personnel");
-      const data = await response.json();
-      if (data.success) {
-        // 映射部门代码到实际的人员类型
-        const departmentTypeMap = {
-          jingkong: "经控贸易",
-          kaitou: "开投贸易",
-          "kaitou-dispatch": "开投贸易派遣",
-        };
+      const personnelData = await getPersonnelByDepartment(department);
 
-        const targetType = departmentTypeMap[department] || department;
-        const filteredPersonnel = Object.values(data.personnel).filter(
-          (person) => person.type === targetType
-        );
+      // 为每个人员添加额外的属性
+      const personnelObjects = personnelData.map((person) => ({
+        ...person,
+        type: getDepartmentName(),
+        department: getDepartmentName(),
+        createdAt: new Date().toISOString(),
+      }));
 
-        // 按ID排序
-        filteredPersonnel.sort((a, b) => {
-          // 将ID转换为数字进行比较
-          const idA = parseInt(a.id) || 0;
-          const idB = parseInt(b.id) || 0;
-          return idA - idB;
-        });
-
-        setPersonnel(filteredPersonnel);
-      }
+      setPersonnel(personnelObjects);
     } catch (error) {
       console.error("获取人员失败:", error);
+      // 如果获取失败，设置为空数组
+      setPersonnel([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    initializeUserId();
+    initializeDeviceId();
     fetchPersonnel();
-    fetchUserEvaluations();
-  }, [department]);
+    fetchDeviceEvaluations();
+  }, [department, role]);
 
   const getDepartmentName = () => {
     const names = {
       jingkong: "经控贸易",
       kaitou: "开投贸易",
-      "kaitou-dispatch": "开投贸易派遣",
     };
     return names[department] || department;
   };
@@ -103,19 +88,12 @@ export function VotePersonnelList({ department, onBack }) {
     const colors = {
       经控贸易: "bg-blue-100 text-blue-800",
       开投贸易: "bg-green-100 text-green-800",
-      开投贸易派遣: "bg-purple-100 text-purple-800",
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-        <div className="text-center">
-          <div className="text-lg">加载中...</div>
-        </div>
-      </div>
-    );
+    return <LoadingPageModern title="正在加载人员数据" />;
   }
 
   return (
@@ -129,6 +107,9 @@ export function VotePersonnelList({ department, onBack }) {
                 {getDepartmentName()} - 人员列表
               </h1>
               <p className="text-gray-600 mt-2">选择人员开始评价</p>
+              <div className="text-sm text-gray-500 mt-1">
+                用户ID: {userId} ({role === "leader" ? "部门负责人" : "员工"})
+              </div>
             </div>
             <Button variant="outline" onClick={onBack}>
               ← 返回首页
@@ -158,14 +139,18 @@ export function VotePersonnelList({ department, onBack }) {
                         Math.random() * unevaluatedPersonnel.length
                       );
                       const randomPerson = unevaluatedPersonnel[randomIndex];
-                      router.push(`/vote/${department}/${randomPerson.id}`);
+                      router.push(
+                        `/vote/${department}/${role}/${randomPerson.id}`
+                      );
                     } else {
                       // 如果所有人员都已评价，随机选择一个
                       const randomIndex = Math.floor(
                         Math.random() * personnel.length
                       );
                       const randomPerson = personnel[randomIndex];
-                      router.push(`/vote/${department}/${randomPerson.id}`);
+                      router.push(
+                        `/vote/${department}/${role}/${randomPerson.id}`
+                      );
                     }
                   }}
                 >
@@ -184,7 +169,7 @@ export function VotePersonnelList({ department, onBack }) {
               size="sm"
               onClick={() => {
                 fetchPersonnel();
-                fetchUserEvaluations();
+                fetchDeviceEvaluations();
               }}
             >
               刷新
@@ -196,6 +181,9 @@ export function VotePersonnelList({ department, onBack }) {
             <Card>
               <CardContent className="text-center py-8">
                 <div className="text-gray-500">暂无人员数据</div>
+                <div className="text-sm text-gray-400 mt-2">
+                  请检查数据库连接或联系管理员
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -258,7 +246,9 @@ export function VotePersonnelList({ department, onBack }) {
                           hasEvaluated ? "bg-green-600 hover:bg-green-700" : ""
                         }`}
                         onClick={() =>
-                          router.push(`/vote/${department}/${person.id}`)
+                          router.push(
+                            `/vote/${department}/${role}/${person.id}`
+                          )
                         }
                       >
                         {hasEvaluated ? "查看评价" : "开始评价"}

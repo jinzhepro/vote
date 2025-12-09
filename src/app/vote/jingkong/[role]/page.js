@@ -2,12 +2,11 @@
 
 import { VotePersonnelList } from "@/components/vote/VotePersonnelList";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+import { use } from "react";
 
-export default function JingkongVotePage() {
+export default function JingkongVotePage({ params }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const role = searchParams.get("role") || "employee";
+  const { role } = use(params);
 
   const handleBack = () => {
     router.push("/");

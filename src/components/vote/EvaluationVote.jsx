@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LoadingButton, LoadingSpinner } from "@/components/ui/loading";
+import { getPersonnelByDepartment } from "@/data/personnelData";
+import {
+  defaultCriteria,
+  calculateTotalScore as calculateScore,
+} from "@/data/evaluationCriteria";
+import { getDeviceId } from "@/lib/deviceId";
 
 export function EvaluationVote({ department, onBack, initialPersonId }) {
   const [personnel, setPersonnel] = useState([]);
@@ -21,84 +28,54 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState("");
 
-  // 初始化用户ID
-  const initializeUserId = () => {
-    let storedUserId = localStorage.getItem(`userId_${department}`);
-    if (!storedUserId) {
-      // 生成一个简单的用户ID（基于时间戳和随机数）
-      storedUserId = `user_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      localStorage.setItem(`userId_${department}`, storedUserId);
-    }
-    setUserId(storedUserId);
-    return storedUserId;
+  // 初始化设备ID
+  const initializeDeviceId = () => {
+    const deviceId = getDeviceId();
+    setUserId(deviceId);
+    return deviceId;
   };
 
-  // 获取部门人员
-  const fetchPersonnel = async () => {
+  // 获取部门人员（从本地数据）
+  const fetchPersonnel = () => {
     try {
-      const response = await fetch("/api/personnel");
-      const data = await response.json();
-      if (data.success) {
-        // 映射部门代码到实际的人员类型
-        const departmentTypeMap = {
-          jingkong: "经控贸易",
-          kaitou: "开投贸易",
-          "kaitou-dispatch": "开投贸易派遣",
-        };
+      const personnelData = getPersonnelByDepartment(department);
 
-        const targetType = departmentTypeMap[department] || department;
-        const filteredPersonnel = Object.values(data.personnel).filter(
-          (person) => person.type === targetType
-        );
-        setPersonnel(filteredPersonnel);
-      }
+      // 为每个人员添加额外的属性
+      const personnelObjects = personnelData.map((person) => ({
+        ...person,
+        type: getDepartmentName(),
+        department: getDepartmentName(),
+        createdAt: new Date().toISOString(),
+      }));
+
+      setPersonnel(personnelObjects);
     } catch (error) {
       console.error("获取人员失败:", error);
     }
   };
 
-  // 获取投票结果和评分标准
-  const fetchVotes = async () => {
+  // 获取投票结果和评分标准（从localStorage）
+  const fetchVotes = () => {
     try {
-      const currentUserId = userId || initializeUserId();
-      const response = await fetch(
-        `/api/department-vote?department=${department}&userId=${currentUserId}`
-      );
-      const data = await response.json();
-      if (data.success) {
-        setVotes(data.votes || {});
-        setCriteria(data.criteria || {});
-        setUserEvaluations(data.userEvaluations || {});
+      const currentDeviceId = userId || initializeDeviceId();
+      const storageKey = `evaluations_${department}_${currentDeviceId}`;
+      const storedEvaluations = localStorage.getItem(storageKey);
 
-        // 如果评分标准为空，则初始化
-        if (!data.criteria || Object.keys(data.criteria).length === 0) {
-          await initializeCriteria();
+      if (storedEvaluations) {
+        try {
+          setUserEvaluations(JSON.parse(storedEvaluations));
+        } catch (error) {
+          console.error("解析评价历史失败:", error);
+          setUserEvaluations({});
         }
+      } else {
+        setUserEvaluations({});
       }
+
+      setCriteria(defaultCriteria);
+      setVotes({});
     } catch (error) {
       console.error("获取投票失败:", error);
-    }
-  };
-
-  // 初始化评分标准
-  const initializeCriteria = async () => {
-    try {
-      const response = await fetch("/api/department-vote", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ department }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setCriteria(data.criteria);
-      }
-    } catch (error) {
-      console.error("初始化评分标准失败:", error);
     }
   };
 
@@ -115,28 +92,35 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
     setLoading(true);
     try {
-      const currentUserId = userId || initializeUserId();
-      const response = await fetch("/api/department-vote", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          department,
-          personId: selectedPerson,
-          evaluations,
-          userId: currentUserId,
-        }),
-      });
+      const currentDeviceId = userId || initializeDeviceId();
+      const totalScore = calculateTotalScore();
 
-      const data = await response.json();
-      if (data.success) {
-        toast.success(`评价提交成功！总分：${data.totalScore}分`);
-        setEvaluations({});
-        await fetchVotes();
-      } else {
-        toast.error(data.error || "评价提交失败");
+      // 保存到localStorage
+      const storageKey = `evaluations_${department}_${currentDeviceId}`;
+      const existingEvaluations = localStorage.getItem(storageKey);
+      let allEvaluations = {};
+
+      if (existingEvaluations) {
+        try {
+          allEvaluations = JSON.parse(existingEvaluations);
+        } catch (error) {
+          console.error("解析现有评价失败:", error);
+        }
       }
+
+      // 更新评价数据
+      allEvaluations[selectedPerson] = {
+        evaluations: evaluations,
+        totalScore: totalScore,
+        timestamp: new Date().toISOString(),
+        userId: currentDeviceId,
+      };
+
+      localStorage.setItem(storageKey, JSON.stringify(allEvaluations));
+
+      toast.success(`评价提交成功！总分：${totalScore}分`);
+      setEvaluations({});
+      fetchVotes();
     } catch (error) {
       console.error("评价提交失败:", error);
       toast.error("评价提交失败");
@@ -165,20 +149,13 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     try {
-      const response = await fetch(
-        `/api/department-vote?department=${department}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const currentDeviceId = userId || initializeDeviceId();
+      const storageKey = `evaluations_${department}_${currentDeviceId}`;
+      localStorage.removeItem(storageKey);
 
-      const data = await response.json();
-      if (data.success) {
-        setVotes({});
-        toast.success("评价数据已重置");
-      } else {
-        toast.error(data.error || "重置失败");
-      }
+      setVotes({});
+      setUserEvaluations({});
+      toast.success("评价数据已重置");
     } catch (error) {
       console.error("重置失败:", error);
       toast.error("重置失败");
@@ -222,7 +199,9 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       );
       const randomPerson = unevaluatedPersonnel[randomIndex];
       // 导航到该人员的评价页面
-      window.location.href = `/vote/${department}/${randomPerson.id}`;
+      window.location.href = `/vote/${department}/${getCurrentRole()}/${
+        randomPerson.id
+      }`;
     } else {
       toast.info("所有人员都已评价完成！");
     }
@@ -230,11 +209,11 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
   // 计算总分
   const calculateTotalScore = () => {
-    return Object.values(evaluations).reduce((sum, score) => sum + score, 0);
+    return calculateScore(evaluations);
   };
 
   useEffect(() => {
-    initializeUserId();
+    initializeDeviceId();
     fetchPersonnel();
     fetchVotes();
   }, [department]);
@@ -243,9 +222,19 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     const names = {
       jingkong: "经控贸易",
       kaitou: "开投贸易",
-      "kaitou-dispatch": "开投贸易派遣",
     };
     return names[department] || department;
+  };
+
+  const getCurrentRole = () => {
+    // 从当前URL路径中获取角色信息
+    const pathParts = window.location.pathname.split("/");
+    const departmentIndex = pathParts.findIndex((part) => part === department);
+    if (departmentIndex !== -1 && pathParts[departmentIndex + 1]) {
+      return pathParts[departmentIndex + 1];
+    }
+    // 默认返回leader
+    return "leader";
   };
 
   return (
@@ -266,16 +255,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
         {/* 评分标准 */}
         <div className="lg:col-span-3">
           <Card>
-            <CardHeader>
-              <CardTitle>评分标准</CardTitle>
-              <CardDescription>
-                {selectedPerson
-                  ? `正在评价：${
-                      personnel.find((p) => p.id === selectedPerson)?.name
-                    }`
-                  : "请指定要评价的人员"}
-              </CardDescription>
-            </CardHeader>
             <CardContent className="space-y-6">
               {Object.entries(criteria).map(([key, criterion]) => (
                 <div key={key} className="space-y-3">
@@ -380,12 +359,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                             personnel.find((p) => p.id === selectedPerson)
                               ?.department
                           }
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">类型：</span>
-                        <span className="font-medium">
-                          {personnel.find((p) => p.id === selectedPerson)?.type}
                         </span>
                       </div>
                       <div className="flex justify-between">

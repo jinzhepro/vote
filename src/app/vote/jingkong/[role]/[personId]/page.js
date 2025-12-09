@@ -4,12 +4,12 @@ import { EvaluationVote } from "@/components/vote/EvaluationVote";
 import { useRouter } from "next/navigation";
 import { use } from "react";
 
-export default function PersonVotePage({ params }) {
+export default function JingkongPersonVotePage({ params }) {
   const router = useRouter();
-  const { personId } = use(params);
+  const { role, personId } = use(params);
 
   const handleBack = () => {
-    router.push("/vote/jingkong");
+    router.push(`/vote/jingkong/${role}`);
   };
 
   return (

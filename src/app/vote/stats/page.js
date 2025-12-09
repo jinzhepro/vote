@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,45 +9,30 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
+import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
 
 export default function StatsPage() {
   const router = useRouter();
-  const [stats, setStats] = useState({});
-  const [loading, setLoading] = useState(true);
-
-  const fetchStats = async () => {
-    try {
-      const response = await fetch("/api/department-vote", {
-        method: "PATCH",
-      });
-      const data = await response.json();
-      if (data.success) {
-        setStats(data.stats);
-      }
-    } catch (error) {
-      console.error("获取统计数据失败:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
 
   const handleBack = () => {
     router.push("/");
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-        <div className="text-center">
-          <div className="text-lg">加载中...</div>
-        </div>
-      </div>
-    );
-  }
+  // 静态统计数据
+  const staticStats = {
+    jingkong: {
+      departmentName: "经控贸易",
+      totalVotes: 0,
+      totalEvaluations: jingkongPersonnel.length,
+      personStats: {},
+    },
+    kaitou: {
+      departmentName: "开投贸易",
+      totalVotes: 0,
+      totalEvaluations: kaitouPersonnel.length,
+      personStats: {},
+    },
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -67,7 +51,7 @@ export default function StatsPage() {
 
           {/* 统计数据 */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {Object.entries(stats).map(([dept, deptStats]) => (
+            {Object.entries(staticStats).map(([dept, deptStats]) => (
               <Card key={dept} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="text-xl">
@@ -133,11 +117,12 @@ export default function StatsPage() {
             ))}
           </div>
 
-          {/* 刷新按钮 */}
+          {/* 说明信息 */}
           <div className="flex justify-center">
-            <Button onClick={fetchStats} variant="outline">
-              刷新数据
-            </Button>
+            <div className="text-center text-gray-500 text-sm">
+              <p>统计功能暂时不可用</p>
+              <p>请联系系统管理员获取详细统计信息</p>
+            </div>
           </div>
         </div>
       </main>

@@ -1,161 +1,86 @@
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
-import { redis, connectRedis } from "@/lib/redis";
 
-// 获取所有人员
-export async function GET() {
+export async function GET(request) {
   try {
-    const personnel = await redis.hgetall("personnel");
+    const { searchParams } = new URL(request.url);
+    const department = searchParams.get("department");
 
-    // 将对象转换为数组并按ID排序
-    const personnelArray = Object.values(personnel);
-    personnelArray.sort((a, b) => {
-      // 将ID转换为数字进行比较
-      const idA = parseInt(a.id) || 0;
-      const idB = parseInt(b.id) || 0;
-      return idA - idB;
+    let query = supabase.from("personnel").select("*");
+
+    // 如果指定了部门，添加过滤条件
+    if (department) {
+      query = query.eq("department", department);
+    }
+
+    const { data, error } = await query
+      .order("department", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (error) {
+      console.error("获取人员数据失败:", error);
+      return NextResponse.json(
+        { error: "获取人员数据失败", details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: data || [],
+      count: data?.length || 0,
     });
-
-    // 将排序后的数组转换回对象
-    const sortedPersonnel = {};
-    personnelArray.forEach((person) => {
-      sortedPersonnel[person.id] = person;
-    });
-
-    return NextResponse.json({ success: true, personnel: sortedPersonnel });
-  } catch (error) {
-    console.error("获取人员失败:", error);
+  } catch (err) {
+    console.error("API 错误:", err);
     return NextResponse.json(
-      { success: false, error: "获取人员失败" },
+      { error: "服务器内部错误", details: err.message },
       { status: 500 }
     );
   }
 }
 
-// 添加人员
 export async function POST(request) {
   try {
-    const { name, department, type } = await request.json();
+    const body = await request.json();
 
-    if (!name || !department || !type) {
+    // 验证必需字段
+    if (!body.id || !body.name || !body.department) {
       return NextResponse.json(
-        { success: false, error: "请提供完整的人员信息" },
+        { error: "缺少必需字段: id, name, department" },
         { status: 400 }
       );
     }
 
-    // 生成唯一ID
-    const id = Date.now().toString();
-    const timestamp = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("personnel")
+      .insert([
+        {
+          id: body.id,
+          name: body.name,
+          department: body.department,
+          department_name: body.department_name || body.department,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select();
 
-    const personData = {
-      id,
-      name,
-      department,
-      type,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    // 存储到Redis
-    await redis.hset("personnel", id, personData);
-
-    // 按部门分类存储
-    await redis.hset(`personnel:${department}`, id, personData);
-
-    // 按类型分类存储
-    await redis.hset(`personnel:type:${type}`, id, personData);
+    if (error) {
+      console.error("添加人员失败:", error);
+      return NextResponse.json(
+        { error: "添加人员失败", details: error.message },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
+      data: data[0],
       message: "人员添加成功",
-      person: personData,
     });
-  } catch (error) {
-    console.error("添加人员失败:", error);
+  } catch (err) {
+    console.error("API 错误:", err);
     return NextResponse.json(
-      { success: false, error: "添加人员失败" },
-      { status: 500 }
-    );
-  }
-}
-
-// 批量导入人员
-export async function PUT(request) {
-  try {
-    const { personnelList } = await request.json();
-
-    if (!personnelList || !Array.isArray(personnelList)) {
-      return NextResponse.json(
-        { success: false, error: "请提供有效的人员列表" },
-        { status: 400 }
-      );
-    }
-
-    const results = [];
-    const timestamp = new Date().toISOString();
-
-    for (const person of personnelList) {
-      if (!person.name || !person.department || !person.type) {
-        results.push({
-          success: false,
-          name: person.name,
-          error: "信息不完整",
-        });
-        continue;
-      }
-
-      const id =
-        Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      const personData = {
-        id,
-        name: person.name,
-        department: person.department,
-        type: person.type,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-
-      // 存储到Redis
-      await redis.hset("personnel", id, personData);
-      await redis.hset(`personnel:${person.department}`, id, personData);
-      await redis.hset(`personnel:type:${person.type}`, id, personData);
-
-      results.push({ success: true, name: person.name, id });
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "批量导入完成",
-      results,
-    });
-  } catch (error) {
-    console.error("批量导入失败:", error);
-    return NextResponse.json(
-      { success: false, error: "批量导入失败" },
-      { status: 500 }
-    );
-  }
-}
-
-// 删除所有人员
-export async function DELETE() {
-  try {
-    // 获取所有人员键
-    const allKeys = await redis.keys("personnel*");
-
-    // 删除所有相关键
-    for (const key of allKeys) {
-      await redis.del(key);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "所有人员数据已删除",
-    });
-  } catch (error) {
-    console.error("删除人员失败:", error);
-    return NextResponse.json(
-      { success: false, error: "删除人员失败" },
+      { error: "服务器内部错误", details: err.message },
       { status: 500 }
     );
   }

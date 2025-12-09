@@ -18,21 +18,20 @@ export default function Home() {
       name: "经控贸易",
       description: "经控贸易部门人员评价系统",
       color: "bg-blue-500",
-      route: "/vote/jingkong",
+      routes: {
+        leader: "/vote/jingkong/leader",
+        employee: "/vote/jingkong/employee",
+      },
     },
     {
       id: "kaitou",
       name: "开投贸易",
       description: "开投贸易部门人员评价系统",
       color: "bg-green-500",
-      route: "/vote/kaitou",
-    },
-    {
-      id: "kaitou-dispatch",
-      name: "开投贸易派遣",
-      description: "开投贸易派遣人员评价系统",
-      color: "bg-purple-500",
-      route: "/vote/kaitou-dispatch",
+      routes: {
+        leader: "/vote/kaitou/leader",
+        employee: "/vote/kaitou/employee",
+      },
     },
   ];
 
@@ -45,55 +44,32 @@ export default function Home() {
               2025年度员工绩效考核
             </h1>
             <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-              选择部门进入对应的人员评价系统。
+              选择部门和身份进入对应的人员评价系统。
             </p>
           </div>
         </div>
 
         {/* 部门入口卡片 */}
         <div className="w-full max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {departments.map((dept) => (
-              <Card
-                key={dept.id}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
-              >
+              <Card key={dept.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className={`w-12 h-12 ${dept.color} rounded-lg mb-4`} />
                   <CardTitle className="text-xl">{dept.name}</CardTitle>
                   <CardDescription>{dept.description}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Button asChild className="w-full">
-                    <Link href={dept.route}>进入评价系统</Link>
+                <CardContent className="space-y-3">
+                  <Button asChild className="w-full" variant="default">
+                    <Link href={dept.routes.leader}>部门负责人入口</Link>
+                  </Button>
+                  <Button asChild className="w-full" variant="outline">
+                    <Link href={dept.routes.employee}>员工入口</Link>
                   </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
-        </div>
-
-        {/* 人员管理入口 */}
-        <div className="w-full max-w-7xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>系统管理</CardTitle>
-              <CardDescription>管理人员信息和系统设置</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4">
-                <Button asChild variant="outline">
-                  <Link href="/personnel">人员管理</Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => (window.location.href = "/vote/stats")}
-                >
-                  查看统计
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>
