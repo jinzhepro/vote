@@ -18,13 +18,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
+import * as XLSX from "xlsx";
+import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
 
 export function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [jingkongPersonnel, setJingkongPersonnel] = useState([]);
-  const [kaitouPersonnel, setKaitouPersonnel] = useState([]);
+  const [apiJingkongPersonnel, setApiJingkongPersonnel] = useState([]);
+  const [apiKaitouPersonnel, setApiKaitouPersonnel] = useState([]);
   const [selectedUserEvaluations, setSelectedUserEvaluations] = useState(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
 
@@ -38,7 +40,7 @@ export function AdminDashboard() {
       if (jingkongResponse.ok) {
         const jingkongResult = await jingkongResponse.json();
         if (jingkongResult.success) {
-          setJingkongPersonnel(jingkongResult.data || []);
+          setApiJingkongPersonnel(jingkongResult.data || []);
         } else {
           console.error("获取经控贸易人员数据失败:", jingkongResult.error);
         }
@@ -49,7 +51,7 @@ export function AdminDashboard() {
       if (kaitouResponse.ok) {
         const kaitouResult = await kaitouResponse.json();
         if (kaitouResult.success) {
-          setKaitouPersonnel(kaitouResult.data || []);
+          setApiKaitouPersonnel(kaitouResult.data || []);
         } else {
           console.error("获取开投贸易人员数据失败:", kaitouResult.error);
         }
@@ -128,13 +130,13 @@ export function AdminDashboard() {
   // 获取人员姓名的函数
   const getPersonnelName = (personnelId) => {
     // 在经控贸易人员中查找
-    const jingkongPerson = jingkongPersonnel.find(
+    const jingkongPerson = apiJingkongPersonnel.find(
       (p) => p.id === personnelId || p.name === personnelId
     );
     if (jingkongPerson) return jingkongPerson.name;
 
     // 在开投贸易人员中查找
-    const kaitouPerson = kaitouPersonnel.find(
+    const kaitouPerson = apiKaitouPersonnel.find(
       (p) => p.id === personnelId || p.name === personnelId
     );
     if (kaitouPerson) return kaitouPerson.name;
@@ -162,32 +164,8 @@ export function AdminDashboard() {
     return criterionNames[criterion] || criterion;
   };
 
-  const getDepartmentStats = (department, personnel) => {
-    if (!stats || !stats.departments[department]) {
-      return {
-        totalPersonnel: personnel.length,
-        evaluatedCount: 0,
-        totalEvaluations: 0,
-        averageScore: 0,
-      };
-    }
-
-    const deptStats = stats.departments[department];
-    const evaluatedPersonnel = new Set(
-      deptStats.evaluations.map((e) => e.personnel_id)
-    );
-
-    return {
-      totalPersonnel: personnel.length,
-      evaluatedCount: evaluatedPersonnel.size,
-      totalEvaluations: deptStats.count,
-      averageScore: deptStats.averageScore,
-    };
-  };
-
   const getPersonnelEvaluations = (personnel) => {
     if (!stats || !stats.personnel) {
-      console.log("No stats or personnel data available");
       return null;
     }
 
@@ -197,41 +175,23 @@ export function AdminDashboard() {
     const personnelName =
       typeof personnel === "string" ? personnel : personnel.name;
 
-    console.log(
-      `Looking for evaluations for: ${personnelName} (ID: ${personnelId})`
-    );
-    console.log("Available personnel keys:", Object.keys(stats.personnel));
-
     // 尝试直接用 ID 查找
     if (stats.personnel[personnelId]) {
-      console.log(`Found direct match for ${personnelId}`);
       return stats.personnel[personnelId];
     }
 
     // 尝试用名称查找
     if (stats.personnel[personnelName]) {
-      console.log(`Found direct match for ${personnelName}`);
       return stats.personnel[personnelName];
     }
 
     // 如果直接查找失败，遍历所有评价数据，查找匹配的人员
-    console.log("No direct match, searching through all evaluations...");
-
     // 收集所有评价数据，查找匹配的人员
     let allEvaluations = [];
     for (const [key, value] of Object.entries(stats.personnel)) {
       if (value.evaluations && Array.isArray(value.evaluations)) {
         allEvaluations = allEvaluations.concat(value.evaluations);
       }
-    }
-
-    console.log(`Total evaluations found: ${allEvaluations.length}`);
-    if (allEvaluations.length > 0) {
-      console.log("Sample evaluation:", allEvaluations[0]);
-      console.log(
-        "Unique personnel_ids in evaluations:",
-        [...new Set(allEvaluations.map((e) => e.personnel_id))].slice(0, 10)
-      );
     }
 
     // 查找匹配的评价（先尝试匹配 ID，再尝试匹配名称）
@@ -242,11 +202,6 @@ export function AdminDashboard() {
       );
     });
 
-    console.log(
-      `Matching evaluations for ${personnelName}:`,
-      matchingEvaluations.length
-    );
-
     if (matchingEvaluations.length > 0) {
       // 重新计算统计数据
       const totalScore = matchingEvaluations.reduce(
@@ -254,10 +209,6 @@ export function AdminDashboard() {
         0
       );
       const averageScore = (totalScore / matchingEvaluations.length).toFixed(1);
-
-      console.log(
-        `Calculated average score for ${personnelName}: ${averageScore}`
-      );
 
       return {
         count: matchingEvaluations.length,
@@ -267,61 +218,71 @@ export function AdminDashboard() {
       };
     }
 
-    console.log(`No evaluations found for ${personnelName}`);
     return null;
   };
 
-  // 调试函数，用于查看评价数据的结构
-  const debugPersonnelData = () => {
-    if (stats && stats.personnel) {
-      console.log("Personnel keys:", Object.keys(stats.personnel));
-      console.log(
-        "Sample personnel data:",
-        Object.entries(stats.personnel).slice(0, 3)
-      );
-
-      // 查看第一个人员的评价数据
-      const firstPersonKey = Object.keys(stats.personnel)[0];
-      if (firstPersonKey && stats.personnel[firstPersonKey]) {
-        console.log(
-          `First person (${firstPersonKey}) evaluations:`,
-          stats.personnel[firstPersonKey]
-        );
-        if (
-          stats.personnel[firstPersonKey].evaluations &&
-          stats.personnel[firstPersonKey].evaluations.length > 0
-        ) {
-          console.log(
-            "First evaluation sample:",
-            stats.personnel[firstPersonKey].evaluations[0]
-          );
-        }
-      }
-
-      // 查看所有评价数据
-      let allEvaluations = [];
-      for (const [key, value] of Object.entries(stats.personnel)) {
-        if (value.evaluations && Array.isArray(value.evaluations)) {
-          allEvaluations = allEvaluations.concat(value.evaluations);
-        }
-      }
-      console.log(
-        `Total evaluations across all personnel: ${allEvaluations.length}`
-      );
-      if (allEvaluations.length > 0) {
-        console.log("Sample evaluation from all data:", allEvaluations[0]);
-        console.log(
-          "Unique personnel_ids in evaluations:",
-          [...new Set(allEvaluations.map((e) => e.personnel_id))].slice(0, 10)
-        );
-      }
+  // 导出Excel功能
+  const exportToExcel = (department, role) => {
+    if (!stats || !stats.users) {
+      alert("没有数据可导出");
+      return;
     }
-  };
 
-  // 在开发环境中调用调试函数
-  if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-    debugPersonnelData();
-  }
+    // 创建工作簿
+    const wb = XLSX.utils.book_new();
+
+    // 获取指定部门的人员（作为列）
+    const departmentPersonnel =
+      department === "jingkong" ? apiJingkongPersonnel : apiKaitouPersonnel;
+    const personnelColumns = departmentPersonnel.map((p) => p.name);
+
+    // 表头：第一列为"评价人"，后面各列为被评价人员姓名
+    const header = ["评价人", ...personnelColumns];
+    const sheetData = [header];
+
+    // 筛选出指定部门和角色的用户
+    const filteredUsers = Object.entries(stats.users).filter(
+      ([_, user]) => user.role === role && user.department === department
+    );
+
+    // 为每个用户创建一行数据
+    filteredUsers.forEach(([userId, userStats]) => {
+      const row = [userId]; // 第一列是评价人ID
+
+      // 为每个被评价人员查找该用户的评分
+      personnelColumns.forEach((personName) => {
+        const person = departmentPersonnel.find((p) => p.name === personName);
+        if (person) {
+          const evaluation = getPersonnelEvaluations(person);
+          const userEvaluation = evaluation?.evaluations?.find(
+            (e) => e.role === role && e.user_id === userId
+          );
+          row.push(userEvaluation ? userEvaluation.total_score : "");
+        } else {
+          row.push("");
+        }
+      });
+
+      sheetData.push(row);
+    });
+
+    // 将数据添加到工作簿
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const sheetName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
+      role === "leader" ? "负责人" : "员工"
+    }评价`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    // 生成文件名（包含当前日期、部门和角色）
+    const today = new Date();
+    const dateStr = today.toISOString().split("T")[0]; // 格式：YYYY-MM-DD
+    const fileName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
+      role === "leader" ? "负责人" : "员工"
+    }评价数据_${dateStr}.xlsx`;
+
+    // 导出文件
+    XLSX.writeFile(wb, fileName);
+  };
 
   if (loading) {
     return (
@@ -330,9 +291,6 @@ export function AdminDashboard() {
       </div>
     );
   }
-
-  const jingkongStats = getDepartmentStats("jingkong", jingkongPersonnel);
-  const kaitouStats = getDepartmentStats("kaitou", kaitouPersonnel);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -357,69 +315,6 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* 统计卡片 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 经控贸易统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">经控贸易</CardTitle>
-                <CardDescription>部门评价统计详情</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {jingkongStats.totalPersonnel}
-                    </div>
-                    <div className="text-gray-600">总人数</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {jingkongStats.evaluatedCount}
-                    </div>
-                    <div className="text-gray-600">已评价人数</div>
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {jingkongStats.averageScore}
-                  </div>
-                  <div className="text-gray-600">平均分数</div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 开投贸易统计 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl">开投贸易</CardTitle>
-                <CardDescription>部门评价统计详情</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {kaitouStats.totalPersonnel}
-                    </div>
-                    <div className="text-gray-600">总人数</div>
-                  </div>
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {kaitouStats.evaluatedCount}
-                    </div>
-                    <div className="text-gray-600">已评价人数</div>
-                  </div>
-                </div>
-                <div className="text-center p-3 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {kaitouStats.averageScore}
-                  </div>
-                  <div className="text-gray-600">平均分数</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* 用户统计 - 按部门分开显示 */}
           <div className="space-y-6">
             <Card>
@@ -433,9 +328,18 @@ export function AdminDashboard() {
                 <div className="space-y-8">
                   {/* 经控贸易用户统计 */}
                   <div>
-                    <h3 className="text-xl font-semibold mb-4 text-blue-600">
-                      经控贸易 - 用户投票详情
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-blue-600">
+                        经控贸易 - 用户投票详情
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exportToExcel("jingkong", "leader")}
+                      >
+                        导出负责人Excel
+                      </Button>
+                    </div>
 
                     {/* Leader 统计 */}
                     <div className="mb-6">
@@ -515,7 +419,7 @@ export function AdminDashboard() {
                           负责人评价的人员平均分
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {jingkongPersonnel.map((person) => {
+                          {apiJingkongPersonnel.map((person) => {
                             const evaluation = getPersonnelEvaluations(person);
                             const leaderEvaluations =
                               evaluation?.evaluations?.filter(
@@ -558,9 +462,18 @@ export function AdminDashboard() {
 
                     {/* 员工统计 */}
                     <div>
-                      <h4 className="font-medium text-lg mb-3 text-green-600">
-                        普通员工 (Employee)
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-green-600">
+                          普通员工 (Employee)
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("jingkong", "employee")}
+                        >
+                          导出员工Excel
+                        </Button>
+                      </div>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) =>
@@ -634,7 +547,7 @@ export function AdminDashboard() {
                           员工评价的人员平均分
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {jingkongPersonnel.map((person) => {
+                          {apiJingkongPersonnel.map((person) => {
                             const evaluation = getPersonnelEvaluations(person);
                             const employeeEvaluations =
                               evaluation?.evaluations?.filter(
@@ -678,9 +591,18 @@ export function AdminDashboard() {
 
                   {/* 开投贸易用户统计 */}
                   <div>
-                    <h3 className="text-xl font-semibold mb-4 text-green-600">
-                      开投贸易 - 用户投票详情
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-green-600">
+                        开投贸易 - 用户投票详情
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => exportToExcel("kaitou", "leader")}
+                      >
+                        导出负责人Excel
+                      </Button>
+                    </div>
 
                     {/* Leader 统计 */}
                     <div className="mb-6">
@@ -759,7 +681,7 @@ export function AdminDashboard() {
                           负责人评价的人员平均分
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {kaitouPersonnel.map((person) => {
+                          {apiKaitouPersonnel.map((person) => {
                             const evaluation = getPersonnelEvaluations(person);
                             const leaderEvaluations =
                               evaluation?.evaluations?.filter(
@@ -802,9 +724,18 @@ export function AdminDashboard() {
 
                     {/* 员工统计 */}
                     <div>
-                      <h4 className="font-medium text-lg mb-3 text-green-600">
-                        普通员工 (Employee)
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-green-600">
+                          普通员工 (Employee)
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("kaitou", "employee")}
+                        >
+                          导出员工Excel
+                        </Button>
+                      </div>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) =>
@@ -878,7 +809,7 @@ export function AdminDashboard() {
                           员工评价的人员平均分
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {kaitouPersonnel.map((person) => {
+                          {apiKaitouPersonnel.map((person) => {
                             const evaluation = getPersonnelEvaluations(person);
                             const employeeEvaluations =
                               evaluation?.evaluations?.filter(

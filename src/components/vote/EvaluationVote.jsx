@@ -29,6 +29,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   const [votes, setVotes] = useState({});
   const [userEvaluations, setUserEvaluations] = useState({});
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [userId, setUserId] = useState("");
   const [selectedPersonDetails, setSelectedPersonDetails] = useState(null);
@@ -42,30 +44,17 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     return deviceId;
   };
 
-  // 获取部门人员（从API）
+  // 获取部门人员（从本地数据）
   const fetchPersonnel = async () => {
     try {
-      let personnelData;
-
-      // 尝试从API获取数据
-      try {
-        personnelData = await getPersonnelByDepartment(department);
-      } catch (apiError) {
-        console.warn("API获取人员数据失败，使用本地备用数据:", apiError);
-        // 如果API失败，使用本地备用数据
-        const { jingkongPersonnel, kaitouPersonnel } = await import(
-          "@/data/personnelData"
-        );
-        personnelData =
-          department === "jingkong" ? jingkongPersonnel : kaitouPersonnel;
-      }
+      // 直接使用本地数据
+      const personnelData = await getPersonnelByDepartment(department);
 
       // 为每个人员添加额外的属性
       const personnelObjects = personnelData.map((person) => ({
         ...person,
         type: getDepartmentName(),
         department: getDepartmentName(),
-        createdAt: new Date().toISOString(),
       }));
 
       setPersonnel(personnelObjects);
@@ -74,39 +63,14 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
   };
 
-  // 获取投票结果和评分标准（从API）
+  // 获取投票结果和评分标准（从本地存储）
   const fetchVotes = async () => {
     try {
       const currentDeviceId = userId || initializeDeviceId();
 
-      // 从API获取评价数据
-      try {
-        const response = await fetch(
-          `/api/evaluations?userId=${currentDeviceId}&department=${department}`
-        );
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          // 将API返回的数据转换为组件需要的格式
-          const evaluationsData = {};
-          result.data.forEach((evaluation) => {
-            evaluationsData[evaluation.personnel_id] = {
-              evaluations: evaluation.scores,
-              totalScore: evaluation.total_score,
-              timestamp: evaluation.timestamp,
-              userId: evaluation.user_id,
-            };
-          });
-
-          setUserEvaluations(evaluationsData);
-        } else {
-          console.warn("API获取评价数据失败");
-          setUserEvaluations({});
-        }
-      } catch (apiError) {
-        console.warn("API请求失败:", apiError);
-        setUserEvaluations({});
-      }
+      // 从本地存储获取评价数据
+      const localEvaluations = loadEvaluationsFromLocal();
+      setUserEvaluations(localEvaluations);
 
       setCriteria(defaultCriteria);
       setVotes({});
@@ -123,28 +87,15 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     try {
-      let personDetails;
+      // 直接从本地数据获取
+      let personDetails = await getPersonnelById(personId);
 
-      // 尝试从API获取数据
-      try {
-        personDetails = await getPersonnelById(personId);
-      } catch (apiError) {
-        console.warn("API获取用户详情失败，使用本地备用数据:", apiError);
-        // 如果API失败，使用本地备用数据
-        const { jingkongPersonnel, kaitouPersonnel } = await import(
-          "@/data/personnelData"
-        );
-        const localPersonnel =
-          department === "jingkong" ? jingkongPersonnel : kaitouPersonnel;
-        const foundPerson = localPersonnel.find((p) => p.id === personId);
-
-        if (foundPerson) {
-          personDetails = {
-            ...foundPerson,
-            department: department,
-            department_name: getDepartmentName(),
-          };
-        }
+      if (personDetails) {
+        personDetails = {
+          ...personDetails,
+          department: department,
+          department_name: getDepartmentName(),
+        };
       }
 
       setSelectedPersonDetails(personDetails);
@@ -154,57 +105,171 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
   };
 
-  // 提交评价
-  const submitEvaluation = async () => {
-    // 检查是否所有评分标准都已选择
-    const requiredCriteria = Object.keys(criteria);
-    const selectedCriteria = Object.keys(evaluations);
+  // 保存评价到本地存储
+  const saveEvaluationToLocal = (personnelId, evaluationsData, totalScore) => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const currentRole = getCurrentRole();
 
-    if (requiredCriteria.length !== selectedCriteria.length) {
-      toast.error("请完成所有评分项目");
-      return;
+    // 获取本地存储的评价数据
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    // 创建新的 localEvaluations 时删除其他 localEvaluations
+    // 只保留当前设备ID的评价数据
+    const newLocalEvaluations = {};
+    if (localEvaluations[currentDeviceId]) {
+      newLocalEvaluations[currentDeviceId] = localEvaluations[currentDeviceId];
     }
 
-    setLoading(true);
-    try {
-      const currentDeviceId = userId || initializeDeviceId();
-      const totalScore = calculateTotalScore();
-      const currentRole = getCurrentRole();
+    // 确保用户数据存在
+    if (!newLocalEvaluations[currentDeviceId]) {
+      newLocalEvaluations[currentDeviceId] = {
+        department: department,
+        role: currentRole,
+        evaluations: {},
+      };
+    }
 
-      // 调用API保存评价数据
-      const response = await fetch("/api/evaluations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+    // 保存当前评价
+    newLocalEvaluations[currentDeviceId].evaluations[personnelId] = {
+      personnelId: personnelId,
+      scores: evaluationsData,
+      totalScore: totalScore,
+      timestamp: new Date().toISOString(),
+      department: department,
+      role: currentRole,
+    };
+
+    // 保存到本地存储
+    localStorage.setItem(
+      "localEvaluations",
+      JSON.stringify(newLocalEvaluations)
+    );
+
+    return newLocalEvaluations[currentDeviceId];
+  };
+
+  // 从本地存储加载评价数据
+  const loadEvaluationsFromLocal = () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    if (localEvaluations[currentDeviceId]) {
+      const userData = localEvaluations[currentDeviceId];
+      const evaluationsData = {};
+
+      // 转换数据格式以匹配组件期望的格式
+      Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
+        evaluationsData[personId] = {
+          evaluations: evaluation.scores,
+          totalScore: evaluation.totalScore,
+          timestamp: evaluation.timestamp,
           userId: currentDeviceId,
-          personnelId: selectedPerson,
-          department: department,
-          role: currentRole,
-          scores: evaluations,
-          totalScore: totalScore,
-        }),
+          isFromServer: false, // 标记为本地数据
+        };
       });
 
-      const result = await response.json();
+      return evaluationsData;
+    }
 
-      if (!response.ok) {
-        throw new Error(result.error || "评价提交失败");
+    return {};
+  };
+
+  // 批量提交本地存储的所有评价（调用API）
+  const submitAllLocalEvaluations = async () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    if (!localEvaluations[currentDeviceId]) {
+      return { success: true, message: "没有需要提交的评价" };
+    }
+
+    const userData = localEvaluations[currentDeviceId];
+    const evaluations = userData.evaluations;
+    const evaluationIds = Object.keys(evaluations);
+
+    if (evaluationIds.length === 0) {
+      return { success: true, message: "没有需要提交的评价" };
+    }
+
+    try {
+      const results = [];
+      const errors = [];
+
+      // 逐个提交评价到服务器
+      for (const [personnelId, evaluation] of Object.entries(evaluations)) {
+        try {
+          const response = await fetch("/api/evaluations", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: currentDeviceId,
+              personnelId: personnelId,
+              department: evaluation.department,
+              role: evaluation.role,
+              scores: evaluation.scores,
+              totalScore: evaluation.totalScore,
+              comments: evaluation.comments || null,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            results.push(result.data);
+            // 标记为已提交
+            evaluation.submitted = true;
+            evaluation.submittedAt = new Date().toISOString();
+          } else {
+            errors.push({
+              personnelId,
+              error: result.error || "提交失败",
+            });
+          }
+        } catch (error) {
+          errors.push({
+            personnelId,
+            error: error.message || "网络错误",
+          });
+        }
       }
 
-      toast.success(`评价提交成功！总分：${totalScore}分`);
-      // 不清空评价表单，让用户看到已提交的评价
-      await fetchVotes();
-      // 确保当前人员的评价正确显示
-      if (selectedPerson && userEvaluations[selectedPerson]) {
-        setEvaluations(userEvaluations[selectedPerson].evaluations);
+      // 创建新的 localEvaluations，只保留当前设备ID的数据
+      const newLocalEvaluations = {};
+      if (localEvaluations[currentDeviceId]) {
+        newLocalEvaluations[currentDeviceId] =
+          localEvaluations[currentDeviceId];
       }
+
+      // 保存更新后的本地数据
+      localStorage.setItem(
+        "localEvaluations",
+        JSON.stringify(newLocalEvaluations)
+      );
+
+      return {
+        success: errors.length === 0,
+        message:
+          errors.length === 0
+            ? `成功提交 ${results.length} 个评价`
+            : `成功提交 ${results.length} 个评价，${errors.length} 个失败`,
+        results,
+        errors,
+      };
     } catch (error) {
-      console.error("评价提交失败:", error);
-      toast.error(error.message || "评价提交失败");
-    } finally {
-      setLoading(false);
+      console.error("批量提交失败:", error);
+      return {
+        success: false,
+        message: "批量提交失败",
+        errors: [{ error: error.message }],
+      };
     }
   };
 
@@ -246,8 +311,13 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   const handlePersonChange = (personId) => {
     setSelectedPerson(personId);
     fetchPersonDetails(personId);
-    if (userEvaluations[personId]) {
-      setEvaluations(userEvaluations[personId].evaluations);
+
+    // 获取合并后的评价数据
+    const mergedEvaluations = getMergedEvaluations();
+
+    // 检查是否有评价记录
+    if (mergedEvaluations[personId]) {
+      setEvaluations(mergedEvaluations[personId].evaluations);
     } else {
       // 设置默认分数
       setEvaluations(getDefaultEvaluations());
@@ -257,8 +327,12 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   // 当selectedPerson或userEvaluations变化时，自动加载评价
   useEffect(() => {
     if (selectedPerson) {
-      if (userEvaluations[selectedPerson]) {
-        setEvaluations(userEvaluations[selectedPerson].evaluations);
+      // 获取合并后的评价数据
+      const mergedEvaluations = getMergedEvaluations();
+
+      // 检查是否有评价记录
+      if (mergedEvaluations[selectedPerson]) {
+        setEvaluations(mergedEvaluations[selectedPerson].evaluations);
       } else {
         // 如果没有评价记录，设置默认分数
         setEvaluations(getDefaultEvaluations());
@@ -268,8 +342,11 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
   // 随机选择一个未评价的人员并导航到该人员的评价页面
   const selectRandomUnevaluatedPerson = () => {
+    const mergedEvaluations = getMergedEvaluations();
+    const evaluatedPersonnel = new Set(Object.keys(mergedEvaluations));
+
     const unevaluatedPersonnel = personnel.filter(
-      (person) => !userEvaluations[person.id]
+      (person) => !evaluatedPersonnel.has(person.id)
     );
 
     if (unevaluatedPersonnel.length > 0) {
@@ -295,7 +372,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     const initializeData = async () => {
       initializeDeviceId();
       await fetchPersonnel();
-      await fetchVotes();
+      await fetchVotes(); // 这会调用 loadEvaluationsFromLocal 并设置 userEvaluations
       setInitialLoading(false);
     };
     initializeData();
@@ -327,6 +404,198 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     return "leader";
   };
 
+  // 获取合并后的评价状态（服务器+本地）
+  const getMergedEvaluations = () => {
+    const localEvaluations = loadEvaluationsFromLocal();
+    return {
+      ...localEvaluations,
+      ...userEvaluations,
+    };
+  };
+
+  // 检查评价是否存在（所有评价都是本地的）
+  const hasEvaluation = (personId) => {
+    const evaluation = getMergedEvaluations()[personId];
+    return evaluation !== undefined;
+  };
+
+  // 保存到本地并下一个
+  const saveAndNext = async () => {
+    // 检查是否所有评分标准都已选择
+    const requiredCriteria = Object.keys(criteria);
+    const selectedCriteria = Object.keys(evaluations);
+
+    if (requiredCriteria.length !== selectedCriteria.length) {
+      toast.error("请完成所有评分项目");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const currentDeviceId = userId || initializeDeviceId();
+      const totalScore = calculateTotalScore();
+
+      // 保存到本地存储
+      saveEvaluationToLocal(selectedPerson, evaluations, totalScore);
+
+      // 更新本地评价数据以反映当前状态
+      const localEvaluations = loadEvaluationsFromLocal();
+      const updatedEvaluations = {
+        ...localEvaluations,
+        ...userEvaluations,
+      };
+      setUserEvaluations(updatedEvaluations);
+
+      toast.success(`评价已保存到本地！总分：${totalScore}分`);
+
+      // 自动跳转到下一个未评价的人员
+      setTimeout(() => {
+        const mergedEvaluations = getMergedEvaluations();
+        const evaluatedPersonnel = new Set(Object.keys(mergedEvaluations));
+        const unevaluatedPersonnel = personnel.filter(
+          (person) => !evaluatedPersonnel.has(person.id)
+        );
+
+        if (unevaluatedPersonnel.length > 0) {
+          const randomIndex = Math.floor(
+            Math.random() * unevaluatedPersonnel.length
+          );
+          const randomPerson = unevaluatedPersonnel[randomIndex];
+          // 导航到该人员的评价页面
+          window.location.href = `/vote/${department}/${getCurrentRole()}/${
+            randomPerson.id
+          }`;
+        } else {
+          toast.info("所有人员都已评价完成！");
+        }
+      }, 1000);
+    } catch (error) {
+      console.error("评价保存失败:", error);
+      toast.error(error.message || "评价保存失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 重新保存当前评价
+  const resaveEvaluation = async () => {
+    // 检查是否所有评分标准都已选择
+    const requiredCriteria = Object.keys(criteria);
+    const selectedCriteria = Object.keys(evaluations);
+
+    if (requiredCriteria.length !== selectedCriteria.length) {
+      toast.error("请完成所有评分项目");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const currentDeviceId = userId || initializeDeviceId();
+      const totalScore = calculateTotalScore();
+
+      // 保存到本地存储
+      saveEvaluationToLocal(selectedPerson, evaluations, totalScore);
+
+      // 更新本地评价数据以反映当前状态
+      const localEvaluations = loadEvaluationsFromLocal();
+      const updatedEvaluations = {
+        ...localEvaluations,
+        ...userEvaluations,
+      };
+      setUserEvaluations(updatedEvaluations);
+
+      toast.success(`评价已重新保存！总分：${totalScore}分`);
+      setTimeout(() => {
+        window.location.href = `/vote/${department}`;
+      }, 1000);
+    } catch (error) {
+      console.error("评价保存失败:", error);
+      toast.error(error.message || "评价保存失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 提交所有评价
+  const submitAllEvaluations = async () => {
+    // 检查是否所有评分标准都已选择
+    const requiredCriteria = Object.keys(criteria);
+    const selectedCriteria = Object.keys(evaluations);
+
+    if (requiredCriteria.length !== selectedCriteria.length) {
+      toast.error("请完成所有评分项目");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const currentDeviceId = userId || initializeDeviceId();
+      const totalScore = calculateTotalScore();
+
+      // 先保存当前评价到本地存储
+      saveEvaluationToLocal(selectedPerson, evaluations, totalScore);
+
+      // 更新本地评价数据以反映当前状态
+      const localEvaluations = loadEvaluationsFromLocal();
+      const updatedEvaluations = {
+        ...localEvaluations,
+        ...userEvaluations,
+      };
+      setUserEvaluations(updatedEvaluations);
+
+      // 显示全屏loading并保存所有本地存储的评价
+      setSubmitting(true);
+      const result = await submitAllLocalEvaluations();
+
+      if (result.success) {
+        toast.success(`所有评价提交成功！${result.message}`);
+        // 直接跳转到成功页面
+        window.location.href = `/vote/success`;
+      } else {
+        toast.error(`评价提交失败：${result.message}`);
+        if (result.errors.length > 0) {
+          console.error("提交错误:", result.errors);
+        }
+      }
+      setSubmitting(false);
+    } catch (error) {
+      console.error("评价提交失败:", error);
+      toast.error(error.message || "评价提交失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 获取按钮禁用状态
+  const getButtonDisabled = () => {
+    return (
+      loading ||
+      !selectedPerson ||
+      Object.keys(evaluations).length !== Object.keys(criteria).length
+    );
+  };
+
+  // 获取重置按钮禁用状态
+  const getResetButtonDisabled = () => {
+    return (
+      !selectedPerson || (hasEvaluation(selectedPerson) && false) // 所有评价都可以重置
+    );
+  };
+
+  // 检查是否为最后一个人
+  const isLastPerson = () => {
+    const evaluatedPersonnel = new Set(Object.keys(getMergedEvaluations()));
+    const unevaluatedPersonnel = personnel.filter(
+      (person) => !evaluatedPersonnel.has(person.id)
+    );
+
+    return (
+      unevaluatedPersonnel.length === 0 ||
+      (unevaluatedPersonnel.length === 1 &&
+        unevaluatedPersonnel[0].id === selectedPerson)
+    );
+  };
+
   return (
     <div className="space-y-6 w-full">
       {/* 标题和导航 */}
@@ -344,250 +613,348 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
       {/* 初始加载状态 */}
       {initialLoading && (
-        <div className="flex items-center justify-center py-32">
-          <LoadingSpinner size="lg" />
+        <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+          <div className="text-center">
+            <LoadingSpinner size="lg" />
+          </div>
         </div>
       )}
 
       {/* 主要内容 */}
       {!initialLoading && (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* 评分标准 */}
-          <div className="lg:col-span-3">
-            <Card>
-              <CardContent className="space-y-6">
-                {Object.entries(criteria).map(([key, criterion]) => (
-                  <div key={key} className="space-y-3">
-                    <div>
-                      <h4 className="font-medium">{criterion.name}</h4>
-                      <p className="text-sm text-gray-600">
-                        {criterion.description}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      {criterion.options.map((option) => (
-                        <label
-                          key={option.value}
-                          className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${
-                            evaluations[key] === option.value
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name={key}
-                            value={option.value}
-                            checked={evaluations[key] === option.value}
-                            onChange={() =>
-                              handleEvaluationChange(key, option.value)
-                            }
-                            disabled={!selectedPerson}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm flex items-center gap-2">
-                              {option.value}分
-                              {userEvaluations[selectedPerson] &&
-                                userEvaluations[selectedPerson].evaluations[
-                                  key
-                                ] === option.value && (
-                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    上次选择
-                                  </span>
-                                )}
-                              {!userEvaluations[selectedPerson] &&
-                                isDefaultValue(key, option.value) && (
-                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    默认
-                                  </span>
-                                )}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {option.label}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
+        <div className="space-y-6">
+          {/* 总体进度 */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold">评价进度</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    已完成 {Object.keys(getMergedEvaluations()).length} /{" "}
+                    {personnel.length} 人
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round(
+                      (Object.keys(getMergedEvaluations()).length /
+                        personnel.length) *
+                        100
+                    )}
+                    %
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                  <div className="text-sm text-gray-500">完成率</div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${
+                        (Object.keys(getMergedEvaluations()).length /
+                          personnel.length) *
+                        100
+                      }%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* 当前人员信息和评价汇总 - 合并粘性容器 */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-6 space-y-6">
-              {/* 当前人员信息 */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* 评分标准 */}
+            <div className="lg:col-span-3">
               <Card>
-                <CardHeader>
-                  <CardTitle>当前评价人员</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedPerson ? (
-                    <div className="space-y-4">
-                      <div className="text-center">
-                        <div
-                          className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                            userEvaluations[selectedPerson]
-                              ? "bg-green-100"
-                              : "bg-blue-100"
-                          }`}
-                        >
-                          <span
-                            className={`text-2xl font-bold ${
-                              userEvaluations[selectedPerson]
-                                ? "text-green-600"
-                                : "text-blue-600"
+                <CardContent className="space-y-6">
+                  {Object.entries(criteria).map(([key, criterion]) => (
+                    <div key={key} className="space-y-3">
+                      <div>
+                        <h4 className="font-medium">{criterion.name}</h4>
+                        <p className="text-sm text-gray-600">
+                          {criterion.description}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {criterion.options.map((option) => {
+                          const mergedEvaluations = getMergedEvaluations();
+                          return (
+                            <label
+                              key={option.value}
+                              className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${
+                                evaluations[key] === option.value
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={key}
+                                value={option.value}
+                                checked={evaluations[key] === option.value}
+                                onChange={() =>
+                                  handleEvaluationChange(key, option.value)
+                                }
+                                disabled={
+                                  !selectedPerson ||
+                                  (mergedEvaluations[selectedPerson] && false) // 所有评价都可以编辑
+                                }
+                                className="mt-1"
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium text-sm flex items-center gap-2">
+                                  {option.value}分
+                                  {mergedEvaluations[selectedPerson] &&
+                                    mergedEvaluations[selectedPerson]
+                                      .evaluations[key] === option.value && (
+                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        已保存
+                                      </span>
+                                    )}
+                                  {!mergedEvaluations[selectedPerson] &&
+                                    isDefaultValue(key, option.value) && (
+                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        默认
+                                      </span>
+                                    )}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {option.label}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 当前人员信息和评价汇总 - 合并粘性容器 */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-6 space-y-6">
+                {/* 当前人员信息 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>当前评价人员</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedPerson ? (
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <div
+                            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                              getMergedEvaluations()[selectedPerson]
+                                ? "bg-green-100"
+                                : "bg-blue-100"
                             }`}
                           >
-                            {selectedPersonDetails?.name?.charAt(0) ||
-                              personnel
-                                .find((p) => p.id === selectedPerson)
-                                ?.name?.charAt(0) ||
-                              "?"}
-                          </span>
-                        </div>
-                        <h3 className="text-xl font-semibold flex items-center justify-center gap-2">
-                          {selectedPersonDetails?.name ||
-                            personnel.find((p) => p.id === selectedPerson)
-                              ?.name}
-                          {userEvaluations[selectedPerson] && (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ 已评价
+                            <span
+                              className={`text-2xl font-bold ${
+                                getMergedEvaluations()[selectedPerson]
+                                  ? "text-green-600"
+                                  : "text-blue-600"
+                              }`}
+                            >
+                              {selectedPersonDetails?.name?.charAt(0) ||
+                                personnel
+                                  .find((p) => p.id === selectedPerson)
+                                  ?.name?.charAt(0) ||
+                                "?"}
                             </span>
-                          )}
-                        </h3>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">部门：</span>
-                          <span className="font-medium">
-                            {selectedPersonDetails?.department_name ||
-                              selectedPersonDetails?.department ||
+                          </div>
+                          <h3 className="text-xl font-semibold flex items-center justify-center gap-2">
+                            {selectedPersonDetails?.name ||
                               personnel.find((p) => p.id === selectedPerson)
-                                ?.department}
-                          </span>
+                                ?.name}
+                            {getMergedEvaluations()[selectedPerson] && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                ✓ 已保存
+                              </span>
+                            )}
+                          </h3>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">ID：</span>
-                          <span className="font-medium">{selectedPerson}</span>
-                        </div>
-                        {userEvaluations[selectedPerson] && (
+                        <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-gray-500">上次评分：</span>
-                            <span className="font-medium text-green-600">
-                              {userEvaluations[selectedPerson].totalScore}分
+                            <span className="text-gray-500">部门：</span>
+                            <span className="font-medium">
+                              {selectedPersonDetails?.department_name ||
+                                selectedPersonDetails?.department ||
+                                personnel.find((p) => p.id === selectedPerson)
+                                  ?.department}
                             </span>
                           </div>
-                        )}
-                        {userEvaluations[selectedPerson] && (
                           <div className="flex justify-between">
-                            <span className="text-gray-500">评价时间：</span>
-                            <span className="font-medium text-green-600">
-                              {new Date(
-                                userEvaluations[selectedPerson].timestamp
-                              ).toLocaleString("zh-CN")}
+                            <span className="text-gray-500">ID：</span>
+                            <span className="font-medium">
+                              {selectedPerson}
                             </span>
                           </div>
-                        )}
+                          {getMergedEvaluations()[selectedPerson] && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">评分：</span>
+                              <span className="font-medium text-green-600">
+                                {
+                                  getMergedEvaluations()[selectedPerson]
+                                    .totalScore
+                                }
+                                分
+                              </span>
+                            </div>
+                          )}
+                          {getMergedEvaluations()[selectedPerson] && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">评价时间：</span>
+                              <span className="font-medium text-green-600">
+                                {new Date(
+                                  getMergedEvaluations()[
+                                    selectedPerson
+                                  ].timestamp
+                                ).toLocaleString("zh-CN")}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      未指定评价人员
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        未指定评价人员
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              {/* 评价汇总 */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>评价汇总</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* 总分显示 */}
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-gray-500 mb-2">
-                      当前总分
+                {/* 评价汇总 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>评价汇总</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* 总分显示 */}
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-gray-500 mb-2">
+                        当前总分
+                      </div>
+                      <div className="text-4xl font-bold text-blue-600">
+                        {calculateTotalScore()}
+                      </div>
+                      <div className="text-sm text-gray-500">分</div>
                     </div>
-                    <div className="text-4xl font-bold text-blue-600">
-                      {calculateTotalScore()}
-                    </div>
-                    <div className="text-sm text-gray-500">分</div>
-                  </div>
 
-                  {/* 进度指示 */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>完成进度</span>
-                      <span>
-                        {Object.keys(evaluations).length}/
-                        {Object.keys(criteria).length}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{
-                          width: `${
-                            (Object.keys(evaluations).length /
-                              Object.keys(criteria).length) *
-                            100
-                          }%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* 提交按钮 */}
-                  <div className="space-y-2">
-                    <Button
-                      onClick={submitEvaluation}
-                      disabled={
-                        loading ||
-                        !selectedPerson ||
-                        Object.keys(evaluations).length !==
-                          Object.keys(criteria).length
+                    {/* 本地存储状态 */}
+                    {(() => {
+                      const localEvaluations = loadEvaluationsFromLocal();
+                      const localCount = Object.keys(localEvaluations).length;
+                      if (localCount > 0) {
+                        return (
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="text-sm text-blue-800">
+                              <div className="font-medium mb-1">
+                                本地评价状态
+                              </div>
+                              <div>已保存 {localCount} 个评价到本地</div>
+                              <div className="text-xs mt-1">
+                                所有评价数据都保存在本地浏览器中
+                              </div>
+                            </div>
+                          </div>
+                        );
                       }
-                      className={`w-full ${
-                        userEvaluations[selectedPerson]
-                          ? "bg-green-600 hover:bg-green-700"
-                          : ""
-                      }`}
-                    >
-                      {loading ? (
-                        <LoadingSpinner size="sm" />
-                      ) : userEvaluations[selectedPerson] ? (
-                        "更新评价"
-                      ) : (
-                        "提交评价"
+                      return null;
+                    })()}
+
+                    {/* 提交按钮 */}
+                    <div className="space-y-2">
+                      {/* 保存到本地并下一个按钮 - 仅在不是最后一个人时显示 */}
+                      {!isLastPerson() && (
+                        <Button
+                          onClick={saveAndNext}
+                          disabled={getButtonDisabled()}
+                          className="w-full"
+                        >
+                          {loading ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            "保存到本地并下一个"
+                          )}
+                        </Button>
                       )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={resetToDefaultScores}
-                      className="w-full"
-                      disabled={!selectedPerson}
-                    >
-                      重置为默认分数
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={selectRandomUnevaluatedPerson}
-                      className="w-full"
-                      disabled={
-                        personnel.filter((p) => !userEvaluations[p.id])
-                          .length === 0
-                      }
-                    >
-                      下一个 →
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+
+                      {/* 重新保存按钮 - 仅当已评价过时显示 */}
+                      {hasEvaluation(selectedPerson) && (
+                        <Button
+                          onClick={resaveEvaluation}
+                          disabled={getButtonDisabled()}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          {loading ? <LoadingSpinner size="sm" /> : "重新保存"}
+                        </Button>
+                      )}
+
+                      {/* 提交所有评价按钮 - 仅在评价最后一个人员时显示 */}
+                      {isLastPerson() && (
+                        <Button
+                          onClick={submitAllEvaluations}
+                          disabled={getButtonDisabled()}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                        >
+                          {loading ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            "保存并提交"
+                          )}
+                        </Button>
+                      )}
+
+                      {/* 重置按钮 */}
+                      <Button
+                        variant="outline"
+                        onClick={resetToDefaultScores}
+                        className="w-full"
+                        disabled={getResetButtonDisabled()}
+                      >
+                        重置为默认分数
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 全屏提交loading */}
+      {submitting && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center flex flex-col items-center justify-center shadow-lg">
+            <LoadingSpinner size="lg" />
+            <h3 className="text-xl font-semibold mt-4 mb-2">正在提交</h3>
+            <p className="text-gray-600">请不要操作，正在保存所有评价数据...</p>
+          </div>
+        </div>
+      )}
+
+      {/* 提交成功烟花效果 */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center shadow-lg">
+            <div className="text-6xl mb-4">🎉</div>
+            <h3 className="text-2xl font-bold text-green-600 mb-2">
+              提交成功！
+            </h3>
+            <p className="text-gray-600">所有评价数据已成功保存</p>
+            <div className="mt-4 space-y-2">
+              <div className="text-sm text-gray-500">评价完成率: 100%</div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-500 h-2 rounded-full"
+                  style={{ width: "100%" }}
+                ></div>
+              </div>
             </div>
           </div>
         </div>

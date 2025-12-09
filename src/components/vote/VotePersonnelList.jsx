@@ -11,8 +11,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { getPersonnelByDepartment } from "@/data/personnelData";
 import { getDeviceId } from "@/lib/deviceId";
+import { TrashIcon, AlertTriangleIcon } from "lucide-react";
 
 export function VotePersonnelList({ department, role = "employee", onBack }) {
   const router = useRouter();
@@ -20,6 +30,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const [userEvaluations, setUserEvaluations] = useState({});
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState("");
+  const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
 
   // 初始化设备ID
   const initializeDeviceId = () => {
@@ -29,38 +40,64 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return deviceId;
   };
 
-  // 获取设备评价历史（从API）
+  // 从本地存储加载评价数据
+  const loadEvaluationsFromLocal = () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    if (localEvaluations[currentDeviceId]) {
+      const userData = localEvaluations[currentDeviceId];
+      const evaluationsData = {};
+
+      // 转换数据格式以匹配组件期望的格式
+      Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
+        evaluationsData[personId] = {
+          evaluations: evaluation.scores,
+          totalScore: evaluation.totalScore,
+          timestamp: evaluation.timestamp,
+          userId: currentDeviceId,
+          isFromServer: false, // 标记为本地数据
+        };
+      });
+
+      return evaluationsData;
+    }
+
+    return {};
+  };
+
+  // 获取设备评价历史（从本地存储）
   const fetchDeviceEvaluations = async () => {
     const currentDeviceId = userId || initializeDeviceId();
 
-    // 从API获取评价数据
+    // 直接从本地存储获取评价数据
     try {
-      const response = await fetch(
-        `/api/evaluations?userId=${currentDeviceId}&department=${department}`
-      );
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        // 将API返回的数据转换为组件需要的格式
-        const evaluationsData = {};
-        result.data.forEach((evaluation) => {
-          evaluationsData[evaluation.personnel_id] = {
-            evaluations: evaluation.scores,
-            totalScore: evaluation.total_score,
-            timestamp: evaluation.timestamp,
-            userId: evaluation.user_id,
-          };
-        });
-
-        setUserEvaluations(evaluationsData);
-      } else {
-        console.warn("API获取评价数据失败");
-        setUserEvaluations({});
-      }
-    } catch (apiError) {
-      console.warn("API请求失败:", apiError);
+      const localEvaluations = loadEvaluationsFromLocal();
+      setUserEvaluations(localEvaluations);
+    } catch (error) {
+      console.error("获取评价数据失败:", error);
       setUserEvaluations({});
     }
+  };
+
+  // 清空所有评价数据
+  const clearAllEvaluations = () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    // 创建新的 localEvaluations，删除所有数据
+    const newLocalEvaluations = {};
+
+    localStorage.setItem(
+      "localEvaluations",
+      JSON.stringify(newLocalEvaluations)
+    );
+    setUserEvaluations({});
+    setClearAllDialogOpen(false);
   };
 
   const getDepartmentName = () => {
@@ -71,7 +108,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return names[department] || department;
   };
 
-  // 获取部门人员（从 Supabase 或本地数据）
+  // 获取部门人员（从本地数据）
   const fetchPersonnel = async () => {
     try {
       const personnelData = await getPersonnelByDepartment(department);
@@ -81,7 +118,6 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
         ...person,
         type: getDepartmentName(),
         department: getDepartmentName(),
-        createdAt: new Date().toISOString(),
       }));
 
       setPersonnel(personnelObjects);
@@ -111,6 +147,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return colors[type] || "bg-gray-100 text-gray-800";
   };
 
+  // 检查评价是否存在（所有评价都是本地的）
+  const hasEvaluation = (personId) => {
+    return userEvaluations[personId] !== undefined;
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
@@ -134,10 +175,67 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                 用户ID: {userId} ({role === "leader" ? "部门负责人" : "员工"})
               </div>
             </div>
-            <Button variant="outline" onClick={onBack}>
-              ← 返回首页
-            </Button>
           </div>
+
+          {/* 本地存储状态提示 */}
+          {(() => {
+            const localEvaluations = loadEvaluationsFromLocal();
+            const localCount = Object.keys(localEvaluations).length;
+            if (localCount > 0) {
+              return (
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="pt-6">
+                    <div className="text-sm text-blue-800">
+                      <div className="font-medium mb-1">本地评价状态</div>
+                      <div>已保存 {localCount} 个评价到本地存储</div>
+                      <div className="text-xs mt-1">
+                        所有评价数据都保存在本地浏览器中
+                      </div>
+                      <div className="mt-3">
+                        <Dialog
+                          open={clearAllDialogOpen}
+                          onOpenChange={setClearAllDialogOpen}
+                        >
+                          <DialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                              <TrashIcon className="w-4 h-4 mr-2" />
+                              清空所有评价数据
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle className="flex items-center gap-2">
+                                <AlertTriangleIcon className="w-5 h-5 text-red-500" />
+                                确认清空所有评价数据
+                              </DialogTitle>
+                              <DialogDescription>
+                                此操作将删除您所有的评价记录，且无法恢复。确定要继续吗？
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => setClearAllDialogOpen(false)}
+                              >
+                                取消
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                onClick={clearAllEvaluations}
+                              >
+                                确认清空
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+            return null;
+          })()}
 
           {/* 快速开始投票按钮 */}
           {personnel.length > 0 && (
@@ -207,20 +305,20 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               <CardContent className="text-center py-8">
                 <div className="text-gray-500">暂无人员数据</div>
                 <div className="text-sm text-gray-400 mt-2">
-                  请检查数据库连接或联系管理员
+                  请检查人员数据配置
                 </div>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {personnel.map((person) => {
-                const hasEvaluated = userEvaluations[person.id];
                 const evaluation = userEvaluations[person.id];
+                const hasEvaluated = hasEvaluation(person.id);
                 return (
                   <Card
                     key={person.id}
                     className={`hover:shadow-md transition-shadow ${
-                      hasEvaluated ? "border-green-200 bg-green-50" : ""
+                      hasEvaluated ? "border-blue-200 bg-blue-50" : ""
                     }`}
                   >
                     <CardHeader className="pb-3">
@@ -228,7 +326,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                         <CardTitle className="text-lg flex items-center gap-2">
                           {person.name}
                           {hasEvaluated && (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                               ✓ 已评价
                             </span>
                           )}
@@ -248,12 +346,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                     <CardContent className="pt-0">
                       <div className="space-y-2 text-xs text-gray-500 mb-4">
                         <div>ID: {person.id}</div>
-                        <div>
-                          创建时间:{" "}
-                          {new Date(person.createdAt).toLocaleString("zh-CN")}
-                        </div>
                         {hasEvaluated && (
-                          <div className="text-green-700 font-medium">
+                          <div className="text-blue-700 font-medium">
                             评价时间:{" "}
                             {new Date(evaluation.timestamp).toLocaleString(
                               "zh-CN"
@@ -261,23 +355,25 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           </div>
                         )}
                         {hasEvaluated && (
-                          <div className="text-green-700 font-medium">
+                          <div className="text-blue-700 font-medium">
                             我的评分: {evaluation.totalScore}分
                           </div>
                         )}
                       </div>
-                      <Button
-                        className={`w-full ${
-                          hasEvaluated ? "bg-green-600 hover:bg-green-700" : ""
-                        }`}
-                        onClick={() =>
-                          router.push(
-                            `/vote/${department}/${role}/${person.id}`
-                          )
-                        }
-                      >
-                        {hasEvaluated ? "查看评价" : "开始评价"}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          className={`flex-1 ${
+                            hasEvaluated ? "bg-blue-600 hover:bg-blue-700" : ""
+                          }`}
+                          onClick={() =>
+                            router.push(
+                              `/vote/${department}/${role}/${person.id}`
+                            )
+                          }
+                        >
+                          {hasEvaluated ? "继续编辑" : "开始评价"}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
