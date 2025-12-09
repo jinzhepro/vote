@@ -10,21 +10,60 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
 import { LoadingSpinner } from "@/components/ui/loading";
 
 export function AdminDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [jingkongPersonnel, setJingkongPersonnel] = useState([]);
+  const [kaitouPersonnel, setKaitouPersonnel] = useState([]);
+
+  const loadPersonnelData = async () => {
+    try {
+      const jingkongResponse = await fetch(
+        "/api/personnel?department=jingkong"
+      );
+      const kaitouResponse = await fetch("/api/personnel?department=kaitou");
+
+      if (jingkongResponse.ok) {
+        const jingkongResult = await jingkongResponse.json();
+        if (jingkongResult.success) {
+          setJingkongPersonnel(jingkongResult.data || []);
+        } else {
+          console.error("获取经控贸易人员数据失败:", jingkongResult.error);
+        }
+      } else {
+        console.error("获取经控贸易人员数据失败");
+      }
+
+      if (kaitouResponse.ok) {
+        const kaitouResult = await kaitouResponse.json();
+        if (kaitouResult.success) {
+          setKaitouPersonnel(kaitouResult.data || []);
+        } else {
+          console.error("获取开投贸易人员数据失败:", kaitouResult.error);
+        }
+      } else {
+        console.error("获取开投贸易人员数据失败");
+      }
+    } catch (error) {
+      console.error("加载人员数据失败:", error);
+    }
+  };
 
   const loadEvaluations = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/evaluations?stats=true");
-      const result = await response.json();
+      // 同时加载评价数据和人员数据
+      const [evaluationsResponse] = await Promise.all([
+        fetch("/api/evaluations?stats=true"),
+        loadPersonnelData(),
+      ]);
 
-      if (response.ok && result.success) {
+      const result = await evaluationsResponse.json();
+
+      if (evaluationsResponse.ok && result.success) {
         setStats(result.data);
       } else {
         console.error("获取统计数据失败:", result.error);
@@ -90,12 +129,143 @@ export function AdminDashboard() {
     };
   };
 
-  const getPersonnelEvaluations = (department, personnelId) => {
-    if (!stats || !stats.personnel[personnelId]) {
+  const getPersonnelEvaluations = (personnel) => {
+    if (!stats || !stats.personnel) {
+      console.log("No stats or personnel data available");
       return null;
     }
-    return stats.personnel[personnelId];
+
+    // personnel 可能是字符串（名称）或对象（包含 id 和 name）
+    const personnelId =
+      typeof personnel === "string" ? personnel : personnel.id;
+    const personnelName =
+      typeof personnel === "string" ? personnel : personnel.name;
+
+    console.log(
+      `Looking for evaluations for: ${personnelName} (ID: ${personnelId})`
+    );
+    console.log("Available personnel keys:", Object.keys(stats.personnel));
+
+    // 尝试直接用 ID 查找
+    if (stats.personnel[personnelId]) {
+      console.log(`Found direct match for ${personnelId}`);
+      return stats.personnel[personnelId];
+    }
+
+    // 尝试用名称查找
+    if (stats.personnel[personnelName]) {
+      console.log(`Found direct match for ${personnelName}`);
+      return stats.personnel[personnelName];
+    }
+
+    // 如果直接查找失败，遍历所有评价数据，查找匹配的人员
+    console.log("No direct match, searching through all evaluations...");
+
+    // 收集所有评价数据，查找匹配的人员
+    let allEvaluations = [];
+    for (const [key, value] of Object.entries(stats.personnel)) {
+      if (value.evaluations && Array.isArray(value.evaluations)) {
+        allEvaluations = allEvaluations.concat(value.evaluations);
+      }
+    }
+
+    console.log(`Total evaluations found: ${allEvaluations.length}`);
+    if (allEvaluations.length > 0) {
+      console.log("Sample evaluation:", allEvaluations[0]);
+      console.log(
+        "Unique personnel_ids in evaluations:",
+        [...new Set(allEvaluations.map((e) => e.personnel_id))].slice(0, 10)
+      );
+    }
+
+    // 查找匹配的评价（先尝试匹配 ID，再尝试匹配名称）
+    const matchingEvaluations = allEvaluations.filter((evaluation) => {
+      return (
+        evaluation.personnel_id === personnelId ||
+        evaluation.personnel_id === personnelName
+      );
+    });
+
+    console.log(
+      `Matching evaluations for ${personnelName}:`,
+      matchingEvaluations.length
+    );
+
+    if (matchingEvaluations.length > 0) {
+      // 重新计算统计数据
+      const totalScore = matchingEvaluations.reduce(
+        (sum, e) => sum + e.total_score,
+        0
+      );
+      const averageScore = (totalScore / matchingEvaluations.length).toFixed(1);
+
+      console.log(
+        `Calculated average score for ${personnelName}: ${averageScore}`
+      );
+
+      return {
+        count: matchingEvaluations.length,
+        totalScore: totalScore,
+        averageScore: averageScore,
+        evaluations: matchingEvaluations,
+      };
+    }
+
+    console.log(`No evaluations found for ${personnelName}`);
+    return null;
   };
+
+  // 调试函数，用于查看评价数据的结构
+  const debugPersonnelData = () => {
+    if (stats && stats.personnel) {
+      console.log("Personnel keys:", Object.keys(stats.personnel));
+      console.log(
+        "Sample personnel data:",
+        Object.entries(stats.personnel).slice(0, 3)
+      );
+
+      // 查看第一个人员的评价数据
+      const firstPersonKey = Object.keys(stats.personnel)[0];
+      if (firstPersonKey && stats.personnel[firstPersonKey]) {
+        console.log(
+          `First person (${firstPersonKey}) evaluations:`,
+          stats.personnel[firstPersonKey]
+        );
+        if (
+          stats.personnel[firstPersonKey].evaluations &&
+          stats.personnel[firstPersonKey].evaluations.length > 0
+        ) {
+          console.log(
+            "First evaluation sample:",
+            stats.personnel[firstPersonKey].evaluations[0]
+          );
+        }
+      }
+
+      // 查看所有评价数据
+      let allEvaluations = [];
+      for (const [key, value] of Object.entries(stats.personnel)) {
+        if (value.evaluations && Array.isArray(value.evaluations)) {
+          allEvaluations = allEvaluations.concat(value.evaluations);
+        }
+      }
+      console.log(
+        `Total evaluations across all personnel: ${allEvaluations.length}`
+      );
+      if (allEvaluations.length > 0) {
+        console.log("Sample evaluation from all data:", allEvaluations[0]);
+        console.log(
+          "Unique personnel_ids in evaluations:",
+          [...new Set(allEvaluations.map((e) => e.personnel_id))].slice(0, 10)
+        );
+      }
+    }
+  };
+
+  // 在开发环境中调用调试函数
+  if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+    debugPersonnelData();
+  }
 
   if (loading) {
     return (
@@ -279,6 +449,52 @@ export function AdminDashboard() {
                           暂无经控贸易部门负责人投票数据
                         </div>
                       )}
+
+                      {/* 经控贸易负责人评价的人员平均分 */}
+                      <div className="mt-6">
+                        <h5 className="font-medium text-md mb-3 text-blue-600">
+                          负责人评价的人员平均分
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {jingkongPersonnel.map((person) => {
+                            const evaluation = getPersonnelEvaluations(person);
+                            const leaderEvaluations =
+                              evaluation?.evaluations?.filter(
+                                (e) =>
+                                  e.role === "leader" &&
+                                  e.department === "jingkong"
+                              );
+                            const averageScore =
+                              leaderEvaluations?.length > 0
+                                ? (
+                                    leaderEvaluations.reduce(
+                                      (sum, e) => sum + e.total_score,
+                                      0
+                                    ) / leaderEvaluations.length
+                                  ).toFixed(1)
+                                : 0;
+
+                            return (
+                              <div
+                                key={person.name}
+                                className={`p-2 border rounded text-sm ${
+                                  averageScore > 0
+                                    ? "bg-blue-50 border-blue-200"
+                                    : "bg-gray-50"
+                                }`}
+                              >
+                                <div className="font-medium">{person.name}</div>
+                                <div className="text-blue-700">
+                                  平均分:{" "}
+                                  {averageScore > 0
+                                    ? `${averageScore}分`
+                                    : "暂无评价"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
                     {/* 员工统计 */}
@@ -349,6 +565,52 @@ export function AdminDashboard() {
                           暂无经控贸易员工投票数据
                         </div>
                       )}
+
+                      {/* 经控贸易员工评价的人员平均分 */}
+                      <div className="mt-6">
+                        <h5 className="font-medium text-md mb-3 text-green-600">
+                          员工评价的人员平均分
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {jingkongPersonnel.map((person) => {
+                            const evaluation = getPersonnelEvaluations(person);
+                            const employeeEvaluations =
+                              evaluation?.evaluations?.filter(
+                                (e) =>
+                                  e.role === "employee" &&
+                                  e.department === "jingkong"
+                              );
+                            const averageScore =
+                              employeeEvaluations?.length > 0
+                                ? (
+                                    employeeEvaluations.reduce(
+                                      (sum, e) => sum + e.total_score,
+                                      0
+                                    ) / employeeEvaluations.length
+                                  ).toFixed(1)
+                                : 0;
+
+                            return (
+                              <div
+                                key={person.name}
+                                className={`p-2 border rounded text-sm ${
+                                  averageScore > 0
+                                    ? "bg-green-50 border-green-200"
+                                    : "bg-gray-50"
+                                }`}
+                              >
+                                <div className="font-medium">{person.name}</div>
+                                <div className="text-green-700">
+                                  平均分:{" "}
+                                  {averageScore > 0
+                                    ? `${averageScore}分`
+                                    : "暂无评价"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -425,6 +687,52 @@ export function AdminDashboard() {
                           暂无开投贸易部门负责人投票数据
                         </div>
                       )}
+
+                      {/* 开投贸易负责人评价的人员平均分 */}
+                      <div className="mt-6">
+                        <h5 className="font-medium text-md mb-3 text-blue-600">
+                          负责人评价的人员平均分
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {kaitouPersonnel.map((person) => {
+                            const evaluation = getPersonnelEvaluations(person);
+                            const leaderEvaluations =
+                              evaluation?.evaluations?.filter(
+                                (e) =>
+                                  e.role === "leader" &&
+                                  e.department === "kaitou"
+                              );
+                            const averageScore =
+                              leaderEvaluations?.length > 0
+                                ? (
+                                    leaderEvaluations.reduce(
+                                      (sum, e) => sum + e.total_score,
+                                      0
+                                    ) / leaderEvaluations.length
+                                  ).toFixed(1)
+                                : 0;
+
+                            return (
+                              <div
+                                key={person.name}
+                                className={`p-2 border rounded text-sm ${
+                                  averageScore > 0
+                                    ? "bg-blue-50 border-blue-200"
+                                    : "bg-gray-50"
+                                }`}
+                              >
+                                <div className="font-medium">{person.name}</div>
+                                <div className="text-blue-700">
+                                  平均分:{" "}
+                                  {averageScore > 0
+                                    ? `${averageScore}分`
+                                    : "暂无评价"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
                     {/* 员工统计 */}
@@ -495,111 +803,58 @@ export function AdminDashboard() {
                           暂无开投贸易员工投票数据
                         </div>
                       )}
+
+                      {/* 开投贸易员工评价的人员平均分 */}
+                      <div className="mt-6">
+                        <h5 className="font-medium text-md mb-3 text-green-600">
+                          员工评价的人员平均分
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {kaitouPersonnel.map((person) => {
+                            const evaluation = getPersonnelEvaluations(person);
+                            const employeeEvaluations =
+                              evaluation?.evaluations?.filter(
+                                (e) =>
+                                  e.role === "employee" &&
+                                  e.department === "kaitou"
+                              );
+                            const averageScore =
+                              employeeEvaluations?.length > 0
+                                ? (
+                                    employeeEvaluations.reduce(
+                                      (sum, e) => sum + e.total_score,
+                                      0
+                                    ) / employeeEvaluations.length
+                                  ).toFixed(1)
+                                : 0;
+
+                            return (
+                              <div
+                                key={person.name}
+                                className={`p-2 border rounded text-sm ${
+                                  averageScore > 0
+                                    ? "bg-green-50 border-green-200"
+                                    : "bg-gray-50"
+                                }`}
+                              >
+                                <div className="font-medium">{person.name}</div>
+                                <div className="text-green-700">
+                                  平均分:{" "}
+                                  {averageScore > 0
+                                    ? `${averageScore}分`
+                                    : "暂无评价"}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-
-          {/* 详细评价数据 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>被评价人员统计</CardTitle>
-              <CardDescription>所有被评价人员的详细评价信息</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* 经控贸易详细数据 */}
-                <div>
-                  <h4 className="font-medium text-lg mb-2">经控贸易</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {jingkongPersonnel.map((person) => {
-                      const evaluation = getPersonnelEvaluations(
-                        "jingkong",
-                        person.id
-                      );
-                      return (
-                        <div
-                          key={person.id}
-                          className={`p-3 border rounded-lg ${
-                            evaluation
-                              ? "bg-green-50 border-green-200"
-                              : "bg-gray-50"
-                          }`}
-                        >
-                          <div className="font-medium">{person.name}</div>
-                          <div className="text-sm text-gray-600">
-                            ID: {person.id}
-                          </div>
-                          {evaluation && (
-                            <>
-                              <div className="text-sm text-green-700 mt-1">
-                                被评价次数: {evaluation.count}
-                              </div>
-                              <div className="text-sm text-green-700">
-                                平均分: {evaluation.averageScore}分
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                最近评价:{" "}
-                                {new Date(
-                                  evaluation.evaluations[0].timestamp
-                                ).toLocaleString("zh-CN")}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 开投贸易详细数据 */}
-                <div>
-                  <h4 className="font-medium text-lg mb-2">开投贸易</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {kaitouPersonnel.map((person) => {
-                      const evaluation = getPersonnelEvaluations(
-                        "kaitou",
-                        person.id
-                      );
-                      return (
-                        <div
-                          key={person.id}
-                          className={`p-3 border rounded-lg ${
-                            evaluation
-                              ? "bg-green-50 border-green-200"
-                              : "bg-gray-50"
-                          }`}
-                        >
-                          <div className="font-medium">{person.name}</div>
-                          <div className="text-sm text-gray-600">
-                            ID: {person.id}
-                          </div>
-                          {evaluation && (
-                            <>
-                              <div className="text-sm text-green-700 mt-1">
-                                被评价次数: {evaluation.count}
-                              </div>
-                              <div className="text-sm text-green-700">
-                                平均分: {evaluation.averageScore}分
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                最近评价:{" "}
-                                {new Date(
-                                  evaluation.evaluations[0].timestamp
-                                ).toLocaleString("zh-CN")}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>
