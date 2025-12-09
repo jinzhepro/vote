@@ -7,6 +7,12 @@ export async function GET(request) {
     const userId = searchParams.get("userId");
     const department = searchParams.get("department");
     const personnelId = searchParams.get("personnelId");
+    const stats = searchParams.get("stats");
+
+    // 如果请求统计数据
+    if (stats === "true") {
+      return await getStatistics(department);
+    }
 
     let query = supabase.from("evaluations").select("*");
 
@@ -40,6 +46,121 @@ export async function GET(request) {
     });
   } catch (err) {
     console.error("API 错误:", err);
+    return NextResponse.json(
+      { error: "服务器内部错误", details: err.message },
+      { status: 500 }
+    );
+  }
+}
+
+// 获取统计数据的函数
+async function getStatistics(department) {
+  try {
+    let query = supabase.from("evaluations").select("*");
+
+    if (department) {
+      query = query.eq("department", department);
+    }
+
+    const { data, error } = await query.order("timestamp", {
+      ascending: false,
+    });
+
+    if (error) {
+      console.error("获取统计数据失败:", error);
+      return NextResponse.json(
+        { error: "获取统计数据失败", details: error.message },
+        { status: 500 }
+      );
+    }
+
+    // 统计数据
+    const stats = {
+      totalEvaluations: data?.length || 0,
+      departments: {},
+      users: {},
+      personnel: {},
+      roles: {
+        leader: { count: 0, evaluations: [] },
+        employee: { count: 0, evaluations: [] },
+      },
+    };
+
+    // 处理每条评价记录
+    data?.forEach((evaluation) => {
+      const dept = evaluation.department;
+      const userId = evaluation.user_id;
+      const personnelId = evaluation.personnel_id;
+      const role = evaluation.role || "employee";
+
+      // 按部门统计
+      if (!stats.departments[dept]) {
+        stats.departments[dept] = {
+          count: 0,
+          averageScore: 0,
+          totalScore: 0,
+          evaluations: [],
+        };
+      }
+      stats.departments[dept].count++;
+      stats.departments[dept].totalScore += evaluation.total_score;
+      stats.departments[dept].evaluations.push(evaluation);
+
+      // 按用户统计
+      if (!stats.users[userId]) {
+        stats.users[userId] = {
+          count: 0,
+          role: role,
+          department: dept,
+          evaluations: [],
+        };
+      }
+      stats.users[userId].count++;
+      stats.users[userId].evaluations.push(evaluation);
+
+      // 按被评价人员统计
+      if (!stats.personnel[personnelId]) {
+        stats.personnel[personnelId] = {
+          count: 0,
+          totalScore: 0,
+          averageScore: 0,
+          evaluations: [],
+        };
+      }
+      stats.personnel[personnelId].count++;
+      stats.personnel[personnelId].totalScore += evaluation.total_score;
+      stats.personnel[personnelId].evaluations.push(evaluation);
+
+      // 按角色统计
+      if (stats.roles[role]) {
+        stats.roles[role].count++;
+        stats.roles[role].evaluations.push(evaluation);
+      }
+    });
+
+    // 计算平均分
+    Object.keys(stats.departments).forEach((dept) => {
+      const deptStats = stats.departments[dept];
+      deptStats.averageScore =
+        deptStats.count > 0
+          ? (deptStats.totalScore / deptStats.count).toFixed(1)
+          : 0;
+    });
+
+    Object.keys(stats.personnel).forEach((personId) => {
+      const personStats = stats.personnel[personId];
+      personStats.averageScore =
+        personStats.count > 0
+          ? (personStats.totalScore / personStats.count).toFixed(1)
+          : 0;
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: stats,
+    });
+  } catch (err) {
+    console.error("统计数据 API 错误:", err);
     return NextResponse.json(
       { error: "服务器内部错误", details: err.message },
       { status: 500 }

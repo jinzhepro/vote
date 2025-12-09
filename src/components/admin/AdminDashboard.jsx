@@ -15,39 +15,25 @@ import { LoadingSpinner } from "@/components/ui/loading";
 
 export function AdminDashboard() {
   const router = useRouter();
-  const [evaluations, setEvaluations] = useState({
-    jingkong: {},
-    kaitou: {},
-  });
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadEvaluations = () => {
-    const allEvaluations = {
-      jingkong: {},
-      kaitou: {},
-    };
+  const loadEvaluations = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/evaluations?stats=true");
+      const result = await response.json();
 
-    // 获取所有设备的评价数据
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith("evaluations_")) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key));
-          const [_, department, deviceId] = key.split("_");
-
-          if (!allEvaluations[department]) {
-            allEvaluations[department] = {};
-          }
-
-          Object.assign(allEvaluations[department], data);
-        } catch (error) {
-          console.error("解析评价数据失败:", error);
-        }
+      if (response.ok && result.success) {
+        setStats(result.data);
+      } else {
+        console.error("获取统计数据失败:", result.error);
       }
+    } catch (error) {
+      console.error("加载统计数据失败:", error);
+    } finally {
+      setLoading(false);
     }
-
-    setEvaluations(allEvaluations);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -67,43 +53,48 @@ export function AdminDashboard() {
     router.push("/admin");
   };
 
-  const clearAllData = () => {
+  const clearAllData = async () => {
     if (confirm("确定要清除所有评价数据吗？此操作不可恢复。")) {
-      // 清除所有评价数据
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("evaluations_")) {
-          localStorage.removeItem(key);
-        }
+      try {
+        // 这里可以添加清除数据库的 API 调用
+        // const response = await fetch('/api/evaluations', { method: 'DELETE' });
+        alert("功能开发中，请联系系统管理员清除数据库数据");
+        loadEvaluations();
+      } catch (error) {
+        console.error("清除数据失败:", error);
+        alert("清除数据失败，请联系系统管理员");
       }
-      loadEvaluations();
-      alert("所有评价数据已清除");
     }
   };
 
   const getDepartmentStats = (department, personnel) => {
-    const deptEvaluations = evaluations[department] || {};
-    const totalPersonnel = personnel.length;
-    const evaluatedCount = Object.keys(deptEvaluations).length;
-    const totalEvaluations = Object.values(deptEvaluations).reduce(
-      (sum, evaluation) => sum + 1,
-      0
-    );
+    if (!stats || !stats.departments[department]) {
+      return {
+        totalPersonnel: personnel.length,
+        evaluatedCount: 0,
+        totalEvaluations: 0,
+        averageScore: 0,
+      };
+    }
 
-    const scores = Object.values(deptEvaluations).map(
-      (evaluation) => evaluation.totalScore
+    const deptStats = stats.departments[department];
+    const evaluatedPersonnel = new Set(
+      deptStats.evaluations.map((e) => e.personnel_id)
     );
-    const averageScore =
-      scores.length > 0
-        ? scores.reduce((sum, score) => sum + score, 0) / scores.length
-        : 0;
 
     return {
-      totalPersonnel,
-      evaluatedCount,
-      totalEvaluations,
-      averageScore: averageScore.toFixed(1),
+      totalPersonnel: personnel.length,
+      evaluatedCount: evaluatedPersonnel.size,
+      totalEvaluations: deptStats.count,
+      averageScore: deptStats.averageScore,
     };
+  };
+
+  const getPersonnelEvaluations = (department, personnelId) => {
+    if (!stats || !stats.personnel[personnelId]) {
+      return null;
+    }
+    return stats.personnel[personnelId];
   };
 
   if (loading) {
@@ -203,11 +194,319 @@ export function AdminDashboard() {
             </Card>
           </div>
 
+          {/* 用户统计 - 按部门分开显示 */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>用户投票统计</CardTitle>
+                <CardDescription>
+                  所有用户的投票详情，按部门分开显示
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-8">
+                  {/* 经控贸易用户统计 */}
+                  <div>
+                    <h3 className="text-xl font-semibold mb-4 text-blue-600">
+                      经控贸易 - 用户投票详情
+                    </h3>
+
+                    {/* Leader 统计 */}
+                    <div className="mb-6">
+                      <h4 className="font-medium text-lg mb-3 text-blue-600">
+                        部门负责人 (Leader)
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) =>
+                          user.role === "leader" &&
+                          user.department === "jingkong"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  部门
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  投票次数
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  最近投票时间
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) =>
+                                      user.role === "leader" &&
+                                      user.department === "jingkong"
+                                  )
+                                  .map(([userId, userStats]) => (
+                                    <tr
+                                      key={userId}
+                                      className="hover:bg-blue-50"
+                                    >
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        {userId}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        经控贸易
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700">
+                                        {userStats.count}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
+                                        {userStats.evaluations[0]
+                                          ? new Date(
+                                              userStats.evaluations[0].timestamp
+                                            ).toLocaleString("zh-CN")
+                                          : "无"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无经控贸易部门负责人投票数据
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 员工统计 */}
+                    <div>
+                      <h4 className="font-medium text-lg mb-3 text-green-600">
+                        普通员工 (Employee)
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) =>
+                          user.role === "employee" &&
+                          user.department === "jingkong"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  部门
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  投票次数
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  最近投票时间
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) =>
+                                      user.role === "employee" &&
+                                      user.department === "jingkong"
+                                  )
+                                  .map(([userId, userStats]) => (
+                                    <tr
+                                      key={userId}
+                                      className="hover:bg-green-50"
+                                    >
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        {userId}
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        经控贸易
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm font-medium text-green-700">
+                                        {userStats.count}
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
+                                        {userStats.evaluations[0]
+                                          ? new Date(
+                                              userStats.evaluations[0].timestamp
+                                            ).toLocaleString("zh-CN")
+                                          : "无"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无经控贸易员工投票数据
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 开投贸易用户统计 */}
+                  <div>
+                    <h3 className="text-xl font-semibold mb-4 text-green-600">
+                      开投贸易 - 用户投票详情
+                    </h3>
+
+                    {/* Leader 统计 */}
+                    <div className="mb-6">
+                      <h4 className="font-medium text-lg mb-3 text-blue-600">
+                        部门负责人 (Leader)
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) =>
+                          user.role === "leader" && user.department === "kaitou"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  部门
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  投票次数
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  最近投票时间
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) =>
+                                      user.role === "leader" &&
+                                      user.department === "kaitou"
+                                  )
+                                  .map(([userId, userStats]) => (
+                                    <tr
+                                      key={userId}
+                                      className="hover:bg-blue-50"
+                                    >
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        {userId}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        开投贸易
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700">
+                                        {userStats.count}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
+                                        {userStats.evaluations[0]
+                                          ? new Date(
+                                              userStats.evaluations[0].timestamp
+                                            ).toLocaleString("zh-CN")
+                                          : "无"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无开投贸易部门负责人投票数据
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 员工统计 */}
+                    <div>
+                      <h4 className="font-medium text-lg mb-3 text-green-600">
+                        普通员工 (Employee)
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) =>
+                          user.role === "employee" &&
+                          user.department === "kaitou"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  部门
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  投票次数
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  最近投票时间
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) =>
+                                      user.role === "employee" &&
+                                      user.department === "kaitou"
+                                  )
+                                  .map(([userId, userStats]) => (
+                                    <tr
+                                      key={userId}
+                                      className="hover:bg-green-50"
+                                    >
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        {userId}
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        开投贸易
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm font-medium text-green-700">
+                                        {userStats.count}
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
+                                        {userStats.evaluations[0]
+                                          ? new Date(
+                                              userStats.evaluations[0].timestamp
+                                            ).toLocaleString("zh-CN")
+                                          : "无"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无开投贸易员工投票数据
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* 详细评价数据 */}
           <Card>
             <CardHeader>
-              <CardTitle>详细评价数据</CardTitle>
-              <CardDescription>所有人员的评价详情</CardDescription>
+              <CardTitle>被评价人员统计</CardTitle>
+              <CardDescription>所有被评价人员的详细评价信息</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -216,7 +515,10 @@ export function AdminDashboard() {
                   <h4 className="font-medium text-lg mb-2">经控贸易</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {jingkongPersonnel.map((person) => {
-                      const evaluation = evaluations.jingkong[person.id];
+                      const evaluation = getPersonnelEvaluations(
+                        "jingkong",
+                        person.id
+                      );
                       return (
                         <div
                           key={person.id}
@@ -231,9 +533,20 @@ export function AdminDashboard() {
                             ID: {person.id}
                           </div>
                           {evaluation && (
-                            <div className="text-sm text-green-700 mt-1">
-                              评分: {evaluation.totalScore}分
-                            </div>
+                            <>
+                              <div className="text-sm text-green-700 mt-1">
+                                被评价次数: {evaluation.count}
+                              </div>
+                              <div className="text-sm text-green-700">
+                                平均分: {evaluation.averageScore}分
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                最近评价:{" "}
+                                {new Date(
+                                  evaluation.evaluations[0].timestamp
+                                ).toLocaleString("zh-CN")}
+                              </div>
+                            </>
                           )}
                         </div>
                       );
@@ -246,7 +559,10 @@ export function AdminDashboard() {
                   <h4 className="font-medium text-lg mb-2">开投贸易</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {kaitouPersonnel.map((person) => {
-                      const evaluation = evaluations.kaitou[person.id];
+                      const evaluation = getPersonnelEvaluations(
+                        "kaitou",
+                        person.id
+                      );
                       return (
                         <div
                           key={person.id}
@@ -261,9 +577,20 @@ export function AdminDashboard() {
                             ID: {person.id}
                           </div>
                           {evaluation && (
-                            <div className="text-sm text-green-700 mt-1">
-                              评分: {evaluation.totalScore}分
-                            </div>
+                            <>
+                              <div className="text-sm text-green-700 mt-1">
+                                被评价次数: {evaluation.count}
+                              </div>
+                              <div className="text-sm text-green-700">
+                                平均分: {evaluation.averageScore}分
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                最近评价:{" "}
+                                {new Date(
+                                  evaluation.evaluations[0].timestamp
+                                ).toLocaleString("zh-CN")}
+                              </div>
+                            </>
                           )}
                         </div>
                       );
