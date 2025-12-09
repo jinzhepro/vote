@@ -10,6 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
 
 export function AdminDashboard() {
@@ -18,6 +25,8 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [jingkongPersonnel, setJingkongPersonnel] = useState([]);
   const [kaitouPersonnel, setKaitouPersonnel] = useState([]);
+  const [selectedUserEvaluations, setSelectedUserEvaluations] = useState(null);
+  const [showUserDetails, setShowUserDetails] = useState(false);
 
   const loadPersonnelData = async () => {
     try {
@@ -104,6 +113,53 @@ export function AdminDashboard() {
         alert("清除数据失败，请联系系统管理员");
       }
     }
+  };
+
+  const handleUserClick = (userId, userStats) => {
+    setSelectedUserEvaluations({
+      userId: userId,
+      role: userStats.role,
+      department: userStats.department,
+      evaluations: userStats.evaluations,
+    });
+    setShowUserDetails(true);
+  };
+
+  // 获取人员姓名的函数
+  const getPersonnelName = (personnelId) => {
+    // 在经控贸易人员中查找
+    const jingkongPerson = jingkongPersonnel.find(
+      (p) => p.id === personnelId || p.name === personnelId
+    );
+    if (jingkongPerson) return jingkongPerson.name;
+
+    // 在开投贸易人员中查找
+    const kaitouPerson = kaitouPersonnel.find(
+      (p) => p.id === personnelId || p.name === personnelId
+    );
+    if (kaitouPerson) return kaitouPerson.name;
+
+    // 如果找不到，返回原始ID
+    return personnelId;
+  };
+
+  // 评分标准中文映射
+  const criterionNames = {
+    responsibility: "责任心",
+    diligence: "勤勉性",
+    dedication: "爱岗敬业",
+    cooperation: "合作性",
+    knowledge: "专业知识",
+    judgment: "判断能力",
+    learning: "学习能力",
+    effectiveness: "工作成效",
+    quality: "工作质量",
+    efficiency: "工作效率",
+  };
+
+  // 获取评分标准中文名称
+  const getCriterionName = (criterion) => {
+    return criterionNames[criterion] || criterion;
   };
 
   const getDepartmentStats = (department, personnel) => {
@@ -421,7 +477,10 @@ export function AdminDashboard() {
                                   .map(([userId, userStats]) => (
                                     <tr
                                       key={userId}
-                                      className="hover:bg-blue-50"
+                                      className="hover:bg-blue-50 cursor-pointer"
+                                      onClick={() =>
+                                        handleUserClick(userId, userStats)
+                                      }
                                     >
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         {userId}
@@ -537,7 +596,10 @@ export function AdminDashboard() {
                                   .map(([userId, userStats]) => (
                                     <tr
                                       key={userId}
-                                      className="hover:bg-green-50"
+                                      className="hover:bg-green-50 cursor-pointer"
+                                      onClick={() =>
+                                        handleUserClick(userId, userStats)
+                                      }
                                     >
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         {userId}
@@ -659,7 +721,10 @@ export function AdminDashboard() {
                                   .map(([userId, userStats]) => (
                                     <tr
                                       key={userId}
-                                      className="hover:bg-blue-50"
+                                      className="hover:bg-blue-50 cursor-pointer"
+                                      onClick={() =>
+                                        handleUserClick(userId, userStats)
+                                      }
                                     >
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         {userId}
@@ -775,7 +840,10 @@ export function AdminDashboard() {
                                   .map(([userId, userStats]) => (
                                     <tr
                                       key={userId}
-                                      className="hover:bg-green-50"
+                                      className="hover:bg-green-50 cursor-pointer"
+                                      onClick={() =>
+                                        handleUserClick(userId, userStats)
+                                      }
                                     >
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         {userId}
@@ -857,6 +925,101 @@ export function AdminDashboard() {
           </div>
         </div>
       </main>
+
+      {/* 用户评价详情弹窗 */}
+      <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto m:max-w-[625px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              用户评价详情 - {selectedUserEvaluations?.userId}
+            </DialogTitle>
+            <DialogDescription>
+              角色:{" "}
+              {selectedUserEvaluations?.role === "leader"
+                ? "部门负责人"
+                : "普通员工"}{" "}
+              | 部门:{" "}
+              {selectedUserEvaluations?.department === "jingkong"
+                ? "经控贸易"
+                : "开投贸易"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">
+              评价记录 ({selectedUserEvaluations?.evaluations?.length || 0})
+            </h3>
+
+            {selectedUserEvaluations?.evaluations?.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                        被评价人员
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                        总分
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                        评价时间
+                      </th>
+                      <th className="border border-gray-200 px-4 py-2 text-left text-sm font-medium text-gray-800">
+                        详细评分
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedUserEvaluations.evaluations.map(
+                      (evaluation, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-2 text-sm">
+                            {getPersonnelName(evaluation.personnel_id)}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-sm font-medium">
+                            {evaluation.total_score}分
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-sm text-gray-600">
+                            {new Date(evaluation.timestamp).toLocaleString(
+                              "zh-CN"
+                            )}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-2 text-sm">
+                            {evaluation.scores &&
+                            typeof evaluation.scores === "object" ? (
+                              <div className="space-y-1">
+                                {Object.entries(evaluation.scores).map(
+                                  ([criterion, score]) => (
+                                    <div
+                                      key={criterion}
+                                      className="flex justify-between"
+                                    >
+                                      <span>
+                                        {getCriterionName(criterion)}:
+                                      </span>
+                                      <span className="font-medium">
+                                        {score}分
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">无详细评分</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 py-8">暂无评价记录</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
