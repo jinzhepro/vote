@@ -20,7 +20,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { getPersonnelByDepartment } from "@/data/personnelData";
 import { getDeviceId } from "@/lib/deviceId";
 import { TrashIcon, AlertTriangleIcon } from "lucide-react";
 
@@ -108,19 +107,30 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return names[department] || department;
   };
 
-  // 获取部门人员（从本地数据）
+  // 获取部门人员（从API）
   const fetchPersonnel = async () => {
     try {
-      const personnelData = await getPersonnelByDepartment(department);
+      const response = await fetch(`/api/personnel?department=${department}`);
 
-      // 为每个人员添加额外的属性
-      const personnelObjects = personnelData.map((person) => ({
-        ...person,
-        type: getDepartmentName(),
-        department: getDepartmentName(),
-      }));
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 为每个人员添加额外的属性
+          const personnelObjects = (result.data || []).map((person) => ({
+            ...person,
+            type: getDepartmentName(),
+            department: getDepartmentName(),
+          }));
 
-      setPersonnel(personnelObjects);
+          setPersonnel(personnelObjects);
+        } else {
+          console.error("获取人员数据失败:", result.error);
+          setPersonnel([]);
+        }
+      } else {
+        console.error("获取人员数据失败");
+        setPersonnel([]);
+      }
     } catch (error) {
       console.error("获取人员失败:", error);
       // 如果获取失败，设置为空数组

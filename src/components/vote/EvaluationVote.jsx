@@ -12,10 +12,6 @@ import {
 } from "@/components/ui/card";
 import { LoadingButton, LoadingSpinner } from "@/components/ui/loading";
 import {
-  getPersonnelByDepartment,
-  getPersonnelById,
-} from "@/data/personnelData";
-import {
   defaultCriteria,
   calculateTotalScore as calculateScore,
 } from "@/data/evaluationCriteria";
@@ -44,22 +40,33 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     return deviceId;
   };
 
-  // 获取部门人员（从本地数据）
+  // 获取部门人员（从API）
   const fetchPersonnel = async () => {
     try {
-      // 直接使用本地数据
-      const personnelData = await getPersonnelByDepartment(department);
+      const response = await fetch(`/api/personnel?department=${department}`);
 
-      // 为每个人员添加额外的属性
-      const personnelObjects = personnelData.map((person) => ({
-        ...person,
-        type: getDepartmentName(),
-        department: getDepartmentName(),
-      }));
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // 为每个人员添加额外的属性
+          const personnelObjects = (result.data || []).map((person) => ({
+            ...person,
+            type: getDepartmentName(),
+            department: getDepartmentName(),
+          }));
 
-      setPersonnel(personnelObjects);
+          setPersonnel(personnelObjects);
+        } else {
+          console.error("获取人员数据失败:", result.error);
+          setPersonnel([]);
+        }
+      } else {
+        console.error("获取人员数据失败");
+        setPersonnel([]);
+      }
     } catch (error) {
       console.error("获取人员失败:", error);
+      setPersonnel([]);
     }
   };
 
@@ -87,18 +94,18 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     try {
-      // 直接从本地数据获取
-      let personDetails = await getPersonnelById(personId);
+      // 从当前人员列表中查找
+      const personDetails = personnel.find((p) => p.id === personId);
 
       if (personDetails) {
-        personDetails = {
+        setSelectedPersonDetails({
           ...personDetails,
           department: department,
           department_name: getDepartmentName(),
-        };
+        });
+      } else {
+        setSelectedPersonDetails(null);
       }
-
-      setSelectedPersonDetails(personDetails);
     } catch (error) {
       console.error("获取用户详情失败:", error);
       setSelectedPersonDetails(null);
