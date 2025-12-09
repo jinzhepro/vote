@@ -266,6 +266,32 @@ export function AdminDashboard() {
       sheetData.push(row);
     });
 
+    // 添加平均值行
+    const averageRow = ["平均值"];
+    personnelColumns.forEach((personName) => {
+      const person = departmentPersonnel.find((p) => p.name === personName);
+      if (person) {
+        const evaluation = getPersonnelEvaluations(person);
+        const roleEvaluations = evaluation?.evaluations?.filter(
+          (e) => e.role === role
+        );
+
+        if (roleEvaluations && roleEvaluations.length > 0) {
+          const totalScore = roleEvaluations.reduce(
+            (sum, e) => sum + e.total_score,
+            0
+          );
+          const averageScore = (totalScore / roleEvaluations.length).toFixed(1);
+          averageRow.push(averageScore);
+        } else {
+          averageRow.push("");
+        }
+      } else {
+        averageRow.push("");
+      }
+    });
+    sheetData.push(averageRow);
+
     // 将数据添加到工作簿
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
     const sheetName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
@@ -363,9 +389,6 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  投票次数
-                                </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   最近投票时间
                                 </th>
                               </tr>
@@ -391,9 +414,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         经控贸易
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700">
-                                        {userStats.count}
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
                                         {userStats.evaluations[0]
@@ -491,9 +511,6 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  投票次数
-                                </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   最近投票时间
                                 </th>
                               </tr>
@@ -519,9 +536,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         经控贸易
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm font-medium text-green-700">
-                                        {userStats.count}
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
                                         {userStats.evaluations[0]
@@ -625,9 +639,6 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  投票次数
-                                </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   最近投票时间
                                 </th>
                               </tr>
@@ -653,9 +664,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         开投贸易
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700">
-                                        {userStats.count}
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
                                         {userStats.evaluations[0]
@@ -753,9 +761,6 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  投票次数
-                                </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   最近投票时间
                                 </th>
                               </tr>
@@ -781,9 +786,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         开投贸易
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm font-medium text-green-700">
-                                        {userStats.count}
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
                                         {userStats.evaluations[0]

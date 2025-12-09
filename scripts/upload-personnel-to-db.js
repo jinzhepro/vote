@@ -1,5 +1,5 @@
 const { createClient } = require("@supabase/supabase-js");
-require("dotenv").config({ path: "./.env.local" });
+require("dotenv").config({ path: "../.env.local" });
 
 // Supabase 配置
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -11,6 +11,18 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// 创建服务角色客户端（绕过RLS策略）
+const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    headers: {
+      Authorization: `Bearer ${supabaseKey}`,
+      apikey: supabaseKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+  },
+});
 
 // 人员数据
 const jingkongPersonnel = [
@@ -67,6 +79,8 @@ const jingkongPersonnel = [
   { name: "陈泉玮" },
   { name: "冯小凡" },
   { name: "冷霜" },
+  { name: "丁鑫" },
+  { name: "张祥舟" },
 ];
 
 const kaitouPersonnel = [
@@ -105,7 +119,7 @@ async function uploadPersonnelData() {
     console.log("开始上传人员数据到数据库...");
 
     // 检查数据库连接
-    const { data: testData, error: testError } = await supabase
+    const { data: testData, error: testError } = await supabaseAdmin
       .from("personnel")
       .select("count")
       .limit(1);
@@ -119,7 +133,7 @@ async function uploadPersonnelData() {
     console.log("数据库连接成功！");
 
     // 清空现有数据（可选）
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from("personnel")
       .delete()
       .neq("id", "");
@@ -151,29 +165,51 @@ async function uploadPersonnelData() {
 
     console.log(`准备上传 ${allPersonnel.length} 条人员记录...`);
 
-    // 分批上传数据（每次最多50条）
-    const batchSize = 50;
+    // 使用原始SQL插入数据（绕过RLS策略）
+    const batchSize = 10; // 减小批次大小
     let successCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < allPersonnel.length; i += batchSize) {
       const batch = allPersonnel.slice(i, i + batchSize);
 
-      const { data, error } = await supabase
-        .from("personnel")
-        .insert(batch)
-        .select();
+      // 构建SQL插入语句
+      const values = batch
+        .map(
+          (person) =>
+            `('${person.id}', '${person.name}', '${person.department}', '${person.department_name}')`
+        )
+        .join(", ");
 
-      if (error) {
-        console.error(`批次 ${Math.floor(i / batchSize) + 1} 上传失败:`, error);
+      const sql = `
+        INSERT INTO personnel (id, name, department, department_name)
+        VALUES ${values}
+        ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        department = EXCLUDED.department,
+        department_name = EXCLUDED.department_name
+      `;
+
+      try {
+        const { data, error } = await supabaseAdmin.rpc("sql", { query: sql });
+
+        if (error) {
+          console.error(
+            `批次 ${Math.floor(i / batchSize) + 1} 上传失败:`,
+            error
+          );
+          errorCount += batch.length;
+        } else {
+          console.log(
+            `批次 ${Math.floor(i / batchSize) + 1} 上传成功 (${
+              batch.length
+            } 条记录)`
+          );
+          successCount += batch.length;
+        }
+      } catch (err) {
+        console.error(`批次 ${Math.floor(i / batchSize) + 1} 上传失败:`, err);
         errorCount += batch.length;
-      } else {
-        console.log(
-          `批次 ${Math.floor(i / batchSize) + 1} 上传成功 (${
-            batch.length
-          } 条记录)`
-        );
-        successCount += batch.length;
       }
     }
 
@@ -186,7 +222,7 @@ async function uploadPersonnelData() {
       console.log("\n人员数据上传完成！");
 
       // 验证上传结果
-      const { data: verifyData, error: verifyError } = await supabase
+      const { data: verifyData, error: verifyError } = await supabaseAdmin
         .from("personnel")
         .select("department, count")
         .group("department");
