@@ -175,9 +175,59 @@ export const getScoreGrade = (score) => {
   const maxScore = getMaxPossibleScore();
   const percentage = (score / maxScore) * 100;
 
-  if (percentage >= 90) return { grade: "优秀", color: "text-green-600" };
-  if (percentage >= 80) return { grade: "良好", color: "text-blue-600" };
-  if (percentage >= 70) return { grade: "中等", color: "text-yellow-600" };
-  if (percentage >= 60) return { grade: "及格", color: "text-orange-600" };
-  return { grade: "不及格", color: "text-red-600" };
+  if (percentage >= 95)
+    return { grade: "优秀", color: "text-green-600", letter: "A" };
+  if (percentage >= 85)
+    return { grade: "良好", color: "text-blue-600", letter: "B" };
+  if (percentage >= 75)
+    return { grade: "合格", color: "text-yellow-600", letter: "C" };
+  if (percentage >= 65)
+    return { grade: "基本合格", color: "text-orange-600", letter: "D" };
+  return { grade: "不合格", color: "text-red-600", letter: "E" };
+};
+
+// 获取评分等级详情的函数
+export const getGradeDetails = () => {
+  return [
+    {
+      min: 95,
+      max: 100,
+      grade: "优秀",
+      letter: "A",
+      color: "text-green-600",
+      description: "95分≤优秀≤100分，优秀要≦7，B良好",
+    },
+    {
+      min: 85,
+      max: 95,
+      grade: "良好",
+      letter: "B",
+      color: "text-blue-600",
+      description: "85分≤良好<95分，C合格≦34-37",
+    },
+    {
+      min: 75,
+      max: 85,
+      grade: "合格",
+      letter: "C",
+      color: "text-yellow-600",
+      description: "75分≤合格<85分，D基本合格E不合格≧5%",
+    },
+    {
+      min: 65,
+      max: 75,
+      grade: "基本合格",
+      letter: "D",
+      color: "text-orange-600",
+      description: "65分≤基本合格<75分，E不合格≧3-6",
+    },
+    {
+      min: 0,
+      max: 65,
+      grade: "不合格",
+      letter: "E",
+      color: "text-red-600",
+      description: "65分以下为不合格",
+    },
+  ];
 };

@@ -14,6 +14,7 @@ import { LoadingButton, LoadingSpinner } from "@/components/ui/loading";
 import {
   defaultCriteria,
   calculateTotalScore as calculateScore,
+  getScoreGrade,
 } from "@/data/evaluationCriteria";
 import { getDeviceId } from "@/lib/deviceId";
 
@@ -849,6 +850,16 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                         {calculateTotalScore()}
                       </div>
                       <div className="text-sm text-gray-500">分</div>
+                      <div className="text-lg font-medium mt-2">
+                        {(() => {
+                          const grade = getScoreGrade(calculateTotalScore());
+                          return (
+                            <span className={grade.color}>
+                              {grade.grade} ({grade.letter})
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     {/* 本地存储状态 */}

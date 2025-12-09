@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { getDeviceId } from "@/lib/deviceId";
 import { TrashIcon, AlertTriangleIcon } from "lucide-react";
+import { getScoreGrade } from "@/data/evaluationCriteria";
 
 export function VotePersonnelList({ department, role = "employee", onBack }) {
   const router = useRouter();
@@ -367,6 +368,21 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                         {hasEvaluated && (
                           <div className="text-blue-700 font-medium">
                             我的评分: {evaluation.totalScore}分
+                          </div>
+                        )}
+                        {hasEvaluated && (
+                          <div className="text-blue-700 font-medium">
+                            等级:{" "}
+                            {(() => {
+                              const grade = getScoreGrade(
+                                evaluation.totalScore
+                              );
+                              return (
+                                <span className={grade.color}>
+                                  {grade.grade} ({grade.letter})
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
