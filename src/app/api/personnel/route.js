@@ -5,7 +5,23 @@ import { redis, connectRedis } from "@/lib/redis";
 export async function GET() {
   try {
     const personnel = await redis.hgetall("personnel");
-    return NextResponse.json({ success: true, personnel });
+
+    // 将对象转换为数组并按ID排序
+    const personnelArray = Object.values(personnel);
+    personnelArray.sort((a, b) => {
+      // 将ID转换为数字进行比较
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      return idA - idB;
+    });
+
+    // 将排序后的数组转换回对象
+    const sortedPersonnel = {};
+    personnelArray.forEach((person) => {
+      sortedPersonnel[person.id] = person;
+    });
+
+    return NextResponse.json({ success: true, personnel: sortedPersonnel });
   } catch (error) {
     console.error("获取人员失败:", error);
     return NextResponse.json(

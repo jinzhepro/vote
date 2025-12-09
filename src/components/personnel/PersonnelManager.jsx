@@ -196,6 +196,14 @@ export function PersonnelManager() {
       );
     }
 
+    // 按ID排序
+    filtered.sort((a, b) => {
+      // 将ID转换为数字进行比较
+      const idA = parseInt(a.id) || 0;
+      const idB = parseInt(b.id) || 0;
+      return idA - idB;
+    });
+
     return filtered;
   };
 

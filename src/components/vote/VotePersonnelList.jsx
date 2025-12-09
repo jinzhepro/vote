@@ -66,6 +66,15 @@ export function VotePersonnelList({ department, onBack }) {
         const filteredPersonnel = Object.values(data.personnel).filter(
           (person) => person.type === targetType
         );
+
+        // 按ID排序
+        filteredPersonnel.sort((a, b) => {
+          // 将ID转换为数字进行比较
+          const idA = parseInt(a.id) || 0;
+          const idB = parseInt(b.id) || 0;
+          return idA - idB;
+        });
+
         setPersonnel(filteredPersonnel);
       }
     } catch (error) {
