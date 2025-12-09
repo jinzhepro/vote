@@ -99,7 +99,7 @@ export function LoadingSkeleton({ className, lines = 3 }) {
   );
 }
 
-export function LoadingCard({ className, title = "加载中..." }) {
+export function LoadingCard({ className }) {
   return (
     <div
       className={cn(
@@ -108,20 +108,15 @@ export function LoadingCard({ className, title = "加载中..." }) {
       )}
     >
       <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center">
           <LoadingPulse size="lg" />
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500 text-center">
-            请稍候，正在获取数据...
-          </p>
-          <LoadingDots size="sm" />
         </div>
       </div>
     </div>
   );
 }
 
-export function LoadingCardGradient({ className, title = "加载中..." }) {
+export function LoadingCardGradient({ className }) {
   return (
     <div
       className={cn(
@@ -130,25 +125,20 @@ export function LoadingCardGradient({ className, title = "加载中..." }) {
       )}
     >
       <div className="loading-gradient-blue rounded-lg shadow-lg p-8 max-w-md w-full mx-4 text-white">
-        <div className="flex flex-col items-center space-y-4">
+        <div className="flex flex-col items-center">
           <div className="animate-float">
             <LoadingSpinner
               size="lg"
               className="text-white border-white border-t-transparent"
             />
           </div>
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-sm text-center opacity-90">
-            请稍候，正在获取数据...
-          </p>
-          <LoadingDots size="sm" />
         </div>
       </div>
     </div>
   );
 }
 
-export function LoadingPage({ className, title = "加载中..." }) {
+export function LoadingPage({ className }) {
   return (
     <div
       className={cn(
@@ -156,23 +146,16 @@ export function LoadingPage({ className, title = "加载中..." }) {
         className
       )}
     >
-      <div className="text-center space-y-6">
+      <div className="text-center">
         <div className="flex justify-center">
           <LoadingSpinner size="xl" />
         </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-          <p className="text-gray-500">正在努力加载，请稍候...</p>
-        </div>
-        <div className="flex justify-center">
-          <LoadingDots size="md" />
-        </div>
       </div>
     </div>
   );
 }
 
-export function LoadingPageModern({ className, title = "加载中..." }) {
+export function LoadingPageModern({ className }) {
   return (
     <div
       className={cn(
@@ -180,11 +163,10 @@ export function LoadingPageModern({ className, title = "加载中..." }) {
         className
       )}
     >
-      <div className="text-center space-y-4">
+      <div className="text-center">
         <div className="flex justify-center">
           <LoadingSpinner size="lg" />
         </div>
-        <div className="text-lg font-medium text-gray-900">{title}</div>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 export function AdminDashboard() {
   const router = useRouter();
@@ -108,9 +109,7 @@ export function AdminDashboard() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-        <div className="text-center">
-          <div className="text-lg">加载中...</div>
-        </div>
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

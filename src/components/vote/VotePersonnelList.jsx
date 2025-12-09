@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { LoadingPageModern } from "@/components/ui/loading";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { getPersonnelByDepartment } from "@/data/personnelData";
 import { getDeviceId } from "@/lib/deviceId";
 
@@ -29,26 +29,50 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return deviceId;
   };
 
-  // 获取设备评价历史（从localStorage）
-  const fetchDeviceEvaluations = () => {
+  // 获取设备评价历史（从API）
+  const fetchDeviceEvaluations = async () => {
     const currentDeviceId = userId || initializeDeviceId();
-    const storageKey = `evaluations_${department}_${currentDeviceId}`;
-    const storedEvaluations = localStorage.getItem(storageKey);
-    if (storedEvaluations) {
-      try {
-        setUserEvaluations(JSON.parse(storedEvaluations));
-      } catch (error) {
-        console.error("解析评价历史失败:", error);
+
+    // 从API获取评价数据
+    try {
+      const response = await fetch(
+        `/api/evaluations?userId=${currentDeviceId}&department=${department}`
+      );
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // 将API返回的数据转换为组件需要的格式
+        const evaluationsData = {};
+        result.data.forEach((evaluation) => {
+          evaluationsData[evaluation.personnel_id] = {
+            evaluations: evaluation.scores,
+            totalScore: evaluation.total_score,
+            timestamp: evaluation.timestamp,
+            userId: evaluation.user_id,
+          };
+        });
+
+        setUserEvaluations(evaluationsData);
+      } else {
+        console.warn("API获取评价数据失败");
         setUserEvaluations({});
       }
-    } else {
+    } catch (apiError) {
+      console.warn("API请求失败:", apiError);
       setUserEvaluations({});
     }
   };
 
+  const getDepartmentName = () => {
+    const names = {
+      jingkong: "经控贸易",
+      kaitou: "开投贸易",
+    };
+    return names[department] || department;
+  };
+
   // 获取部门人员（从 Supabase 或本地数据）
   const fetchPersonnel = async () => {
-    setLoading(true);
     try {
       const personnelData = await getPersonnelByDepartment(department);
 
@@ -65,24 +89,19 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       console.error("获取人员失败:", error);
       // 如果获取失败，设置为空数组
       setPersonnel([]);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    initializeDeviceId();
-    fetchPersonnel();
-    fetchDeviceEvaluations();
-  }, [department, role]);
-
-  const getDepartmentName = () => {
-    const names = {
-      jingkong: "经控贸易",
-      kaitou: "开投贸易",
+    const initializeData = async () => {
+      setLoading(true);
+      initializeDeviceId();
+      await fetchPersonnel();
+      await fetchDeviceEvaluations();
+      setLoading(false);
     };
-    return names[department] || department;
-  };
+    initializeData();
+  }, [department, role]);
 
   const getTypeColor = (type) => {
     const colors = {
@@ -93,7 +112,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   };
 
   if (loading) {
-    return <LoadingPageModern title="正在加载人员数据" />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
   }
 
   return (
@@ -167,9 +190,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                fetchPersonnel();
-                fetchDeviceEvaluations();
+              onClick={async () => {
+                setLoading(true);
+                await fetchPersonnel();
+                await fetchDeviceEvaluations();
+                setLoading(false);
               }}
             >
               刷新

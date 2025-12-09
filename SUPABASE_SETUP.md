@@ -62,6 +62,10 @@ DROP POLICY IF EXISTS "Allow anonymous read access to personnel" ON personnel;
 CREATE POLICY "Allow anonymous read access to personnel" ON personnel
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Allow insert personnel" ON personnel;
+CREATE POLICY "Allow insert personnel" ON personnel
+  FOR INSERT WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Allow insert evaluations" ON evaluations;
 CREATE POLICY "Allow insert evaluations" ON evaluations
   FOR INSERT WITH CHECK (true);

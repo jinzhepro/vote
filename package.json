@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "setup:supabase": "node scripts/setup-complete.js",
+    "setup:tables": "node scripts/setup-supabase-tables.js",
+    "setup:db": "node scripts/setup-database-tables.js",
+    "setup:guide": "node scripts/create-tables-manually.js",
     "test:supabase": "node scripts/test-supabase.js",
     "import:personnel": "node scripts/import-personnel-to-supabase.js",
-    "create:tables": "node scripts/create-supabase-tables.js"
+    "upload:personnel": "node scripts/upload-personnel-to-db.js",
+    "fix:rls": "node scripts/fix-rls-policies.js"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
