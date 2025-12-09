@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { getDeviceId } from "@/lib/deviceId";
-import { TrashIcon, AlertTriangleIcon } from "lucide-react";
-import { getScoreGrade } from "@/data/evaluationCriteria";
+import { TrashIcon, AlertTriangleIcon, FilterIcon, XIcon } from "lucide-react";
+import { getScoreGrade, getGradeDetails } from "@/data/evaluationCriteria";
 
 export function VotePersonnelList({ department, role = "employee", onBack }) {
   const router = useRouter();
@@ -31,6 +31,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState("");
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState(null);
 
   // 初始化设备ID
   const initializeDeviceId = () => {
@@ -150,6 +151,51 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     initializeData();
   }, [department, role]);
 
+  // 使用useMemo计算过滤后的人员列表
+  const filteredPersonnel = useMemo(() => {
+    if (selectedGrade) {
+      return personnel.filter((person) => {
+        const evaluation = userEvaluations[person.id];
+        if (!evaluation) return false;
+
+        const grade = getScoreGrade(evaluation.totalScore);
+        return grade.letter === selectedGrade;
+      });
+    }
+    return personnel;
+  }, [personnel, userEvaluations, selectedGrade]);
+
+  // 清除等级过滤
+  const clearGradeFilter = () => {
+    setSelectedGrade(null);
+  };
+
+  // 获取等级统计
+  const getGradeStatistics = () => {
+    const stats = {};
+    const gradeDetails = getGradeDetails();
+
+    // 初始化统计
+    gradeDetails.forEach((grade) => {
+      stats[grade.letter] = {
+        ...grade,
+        count: 0,
+        evaluatedCount: 0,
+      };
+    });
+
+    // 统计已评价人员的等级
+    Object.values(userEvaluations).forEach((evaluation) => {
+      const grade = getScoreGrade(evaluation.totalScore);
+      if (stats[grade.letter]) {
+        stats[grade.letter].count++;
+        stats[grade.letter].evaluatedCount++;
+      }
+    });
+
+    return stats;
+  };
+
   const getTypeColor = (type) => {
     const colors = {
       经控贸易: "bg-blue-100 text-blue-800",
@@ -248,81 +294,111 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
             return null;
           })()}
 
-          {/* 快速开始投票按钮 */}
-          {personnel.length > 0 && (
+          {/* 人员统计和等级过滤 */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span>共 {personnel.length} 人</span>
+              <span>已评价 {Object.keys(userEvaluations).length} 人</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setLoading(true);
+                  await fetchPersonnel();
+                  await fetchDeviceEvaluations();
+                  setLoading(false);
+                }}
+              >
+                刷新
+              </Button>
+            </div>
+
+            {/* 等级过滤器 */}
             <Card>
-              <CardHeader>
-                <CardTitle>快速开始</CardTitle>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">等级过滤</CardTitle>
+                  {selectedGrade && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearGradeFilter}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <XIcon className="w-4 h-4 mr-1" />
+                      清除过滤
+                    </Button>
+                  )}
+                </div>
                 <CardDescription>
-                  随机选择一个未评价的人员开始评价
+                  点击等级标签可以过滤对应等级的人员
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    const unevaluatedPersonnel = personnel.filter(
-                      (person) => !userEvaluations[person.id]
-                    );
+                <div className="flex flex-wrap gap-2">
+                  {getGradeDetails().map((grade) => {
+                    const stats = getGradeStatistics();
+                    const gradeStats = stats[grade.letter];
+                    const isSelected = selectedGrade === grade.letter;
 
-                    if (unevaluatedPersonnel.length > 0) {
-                      const randomIndex = Math.floor(
-                        Math.random() * unevaluatedPersonnel.length
-                      );
-                      const randomPerson = unevaluatedPersonnel[randomIndex];
-                      router.push(
-                        `/vote/${department}/${role}/${randomPerson.id}`
-                      );
-                    } else {
-                      // 如果所有人员都已评价，随机选择一个
-                      const randomIndex = Math.floor(
-                        Math.random() * personnel.length
-                      );
-                      const randomPerson = personnel[randomIndex];
-                      router.push(
-                        `/vote/${department}/${role}/${randomPerson.id}`
-                      );
-                    }
-                  }}
-                >
-                  随机开始评价
-                </Button>
+                    return (
+                      <Button
+                        key={grade.letter}
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setSelectedGrade(isSelected ? null : grade.letter)
+                        }
+                        className={`flex items-center gap-2 ${
+                          isSelected ? "" : grade.color
+                        }`}
+                      >
+                        <span className="font-medium">{grade.letter}</span>
+                        <span className="text-xs">({gradeStats.count})</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+                {selectedGrade && (
+                  <div className="mt-3 text-sm text-gray-600">
+                    当前过滤:{" "}
+                    <span className="font-medium">{selectedGrade}</span> 等级 -
+                    显示 {filteredPersonnel.length} 人
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
-
-          {/* 人员统计 */}
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <span>共 {personnel.length} 人</span>
-            <span>已评价 {Object.keys(userEvaluations).length} 人</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                setLoading(true);
-                await fetchPersonnel();
-                await fetchDeviceEvaluations();
-                setLoading(false);
-              }}
-            >
-              刷新
-            </Button>
           </div>
 
           {/* 人员列表 */}
-          {personnel.length === 0 ? (
+          {filteredPersonnel.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8">
-                <div className="text-gray-500">暂无人员数据</div>
-                <div className="text-sm text-gray-400 mt-2">
-                  请检查人员数据配置
+                <div className="text-gray-500">
+                  {selectedGrade
+                    ? `没有找到 ${selectedGrade} 等级的人员`
+                    : "暂无人员数据"}
                 </div>
+                <div className="text-sm text-gray-400 mt-2">
+                  {selectedGrade
+                    ? "请尝试选择其他等级或清除过滤"
+                    : "请检查人员数据配置"}
+                </div>
+                {selectedGrade && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearGradeFilter}
+                    className="mt-4"
+                  >
+                    清除过滤
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {personnel.map((person) => {
+              {filteredPersonnel.map((person) => {
                 const evaluation = userEvaluations[person.id];
                 const hasEvaluated = hasEvaluation(person.id);
                 return (
