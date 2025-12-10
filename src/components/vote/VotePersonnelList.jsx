@@ -471,7 +471,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                     <div className="space-y-1">
                       <div>
                         {department === "jingkong"
-                          ? "经控贸易部门等级分布要求：A≤8人，B+C=39-42人，D+E=3-6人"
+                          ? "经控贸易部门等级分布要求：A≤8人，B+C=40-44人，D+E=3-6人"
                           : "开投贸易部门等级分布要求：A≤3人，B+C=15-17人，D+E=1-4人"}
                       </div>
                       {department === "jingkong" && (
@@ -537,7 +537,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                               const bcCount = stats.B.count + stats.C.count;
                               const isValid =
                                 department === "jingkong"
-                                  ? bcCount >= 39 && bcCount <= 42
+                                  ? bcCount >= 40 && bcCount <= 44
                                   : bcCount >= 15 && bcCount <= 17;
                               return isValid
                                 ? "text-green-600"
@@ -547,7 +547,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                             {getGradeStatistics().B.count +
                               getGradeStatistics().C.count}
                             人 /{" "}
-                            {department === "jingkong" ? "39-42人" : "15-17人"}
+                            {department === "jingkong" ? "40-44人" : "15-17人"}
                           </span>
                         </div>
                         <div className="flex justify-between">

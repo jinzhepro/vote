@@ -242,7 +242,7 @@ export const validateGradeDistribution = (evaluations, department) => {
     // 经控贸易部门规则
     validationRules = {
       A: { max: 8, description: "≤8人" },
-      BC: { min: 39, max: 42, description: "39-42人" },
+      BC: { min: 40, max: 44, description: "40-44人" },
       DE: { min: 3, max: 6, description: "3-6人" },
     };
     departmentName = "经控贸易";
@@ -413,7 +413,7 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
   // 根据部门获取限制值
   let limits;
   if (department === "jingkong") {
-    limits = { A: 8, BC: { min: 39, max: 42 }, DE: { min: 3, max: 6 } };
+    limits = { A: 8, BC: { min: 40, max: 44 }, DE: { min: 3, max: 6 } };
   } else if (department === "kaitou") {
     limits = { A: 3, BC: { min: 15, max: 17 }, DE: { min: 1, max: 4 } };
   } else {

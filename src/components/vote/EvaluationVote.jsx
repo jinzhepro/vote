@@ -274,8 +274,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
   // 重置为默认分数
   const resetToDefaultScores = () => {
-    setEvaluations(getDefaultEvaluations());
-    toast.info("已重置为默认分数");
+    setEvaluations({});
+    toast.info("已清空所有评分");
   };
 
   // 获取默认评分（每个评价标准的中间值）
@@ -310,8 +310,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     if (mergedEvaluations[personId]) {
       setEvaluations(mergedEvaluations[personId].evaluations);
     } else {
-      // 设置默认分数
-      setEvaluations(getDefaultEvaluations());
+      // 不设置默认分数，保持为空
+      setEvaluations({});
     }
   };
 
@@ -325,8 +325,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       if (mergedEvaluations[selectedPerson]) {
         setEvaluations(mergedEvaluations[selectedPerson].evaluations);
       } else {
-        // 如果没有评价记录，设置默认分数
-        setEvaluations(getDefaultEvaluations());
+        // 如果没有评价记录，不设置默认分数，保持为空
+        setEvaluations({});
       }
     }
   }, [selectedPerson, userEvaluations]);
@@ -730,12 +730,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                                         已保存
                                       </span>
                                     )}
-                                  {evaluations[key] === option.value &&
-                                    isDefaultValue(key, option.value) && (
-                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                        默认
-                                      </span>
-                                    )}
+                                  {/* 移除默认标签显示 */}
                                 </div>
                                 <div className="text-sm text-gray-600">
                                   {option.label}
@@ -851,6 +846,42 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                     <CardTitle>评价汇总</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* 当前评价进度 */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        当前评价进度
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">已完成项目：</span>
+                          <span className="font-medium">
+                            {Object.keys(evaluations).length} /{" "}
+                            {Object.keys(criteria).length}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${
+                                (Object.keys(evaluations).length /
+                                  Object.keys(criteria).length) *
+                                100
+                              }%`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="text-center text-xs text-gray-500">
+                          {Math.round(
+                            (Object.keys(evaluations).length /
+                              Object.keys(criteria).length) *
+                              100
+                          )}
+                          %
+                        </div>
+                      </div>
+                    </div>
+
                     {/* 总分显示 */}
                     <div className="text-center">
                       <div className="text-sm font-medium text-gray-500 mb-2">
@@ -949,11 +980,11 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                       {/* 重置按钮 */}
                       <Button
                         variant="outline"
-                        onClick={resetToDefaultScores}
+                        onClick={() => setEvaluations({})}
                         className="w-full"
                         disabled={getResetButtonDisabled()}
                       >
-                        重置为默认分数
+                        清空所有评分
                       </Button>
                     </div>
                   </CardContent>
