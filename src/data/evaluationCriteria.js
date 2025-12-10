@@ -231,3 +231,240 @@ export const getGradeDetails = () => {
     },
   ];
 };
+
+// 验证等级分布是否符合要求
+export const validateGradeDistribution = (evaluations, department) => {
+  // 根据不同部门设置不同的验证规则
+  let validationRules;
+  let departmentName;
+
+  if (department === "jingkong") {
+    // 经控贸易部门规则
+    validationRules = {
+      A: { max: 8, description: "≤8人" },
+      BC: { min: 39, max: 42, description: "39-42人" },
+      DE: { min: 3, max: 6, description: "3-6人" },
+    };
+    departmentName = "经控贸易";
+  } else if (department === "kaitou") {
+    // 开投贸易部门规则
+    validationRules = {
+      A: { max: 3, description: "≤3人" },
+      BC: { min: 15, max: 17, description: "15-17人" },
+      DE: { min: 1, max: 4, description: "1-4人" },
+    };
+    departmentName = "开投贸易";
+  } else {
+    // 其他部门不需要等级分布验证
+    return { valid: true, message: "该部门不需要等级分布验证" };
+  }
+
+  // 统计各等级人数
+  const gradeCounts = {
+    A: 0, // 优秀
+    B: 0, // 良好
+    C: 0, // 合格
+    D: 0, // 基本合格
+    E: 0, // 不合格
+  };
+
+  // 计算每个评价的等级
+  Object.values(evaluations).forEach((evaluation) => {
+    const grade = getScoreGrade(evaluation.totalScore);
+    gradeCounts[grade.letter]++;
+  });
+
+  const totalEvaluated = Object.keys(evaluations).length;
+
+  const aCount = gradeCounts.A;
+  const bcCount = gradeCounts.B + gradeCounts.C;
+  const deCount = gradeCounts.D + gradeCounts.E;
+
+  // 检查A等级
+  if (aCount > validationRules.A.max) {
+    return {
+      valid: false,
+      message: `${departmentName}部门：A等级（优秀）人数不能超过${validationRules.A.max}人，当前为${aCount}人`,
+      details: {
+        current: {
+          A: aCount,
+          B: gradeCounts.B,
+          C: gradeCounts.C,
+          D: gradeCounts.D,
+          E: gradeCounts.E,
+        },
+        required: {
+          A: validationRules.A.description,
+          "B+C": validationRules.BC.description,
+          "D+E": validationRules.DE.description,
+        },
+        totalEvaluated,
+        department,
+      },
+    };
+  }
+
+  // 检查B+C等级
+  if (bcCount < validationRules.BC.min || bcCount > validationRules.BC.max) {
+    return {
+      valid: false,
+      message: `${departmentName}部门：B等级（良好）+ C等级（合格）人数应在${validationRules.BC.description}之间，当前为${bcCount}人`,
+      details: {
+        current: {
+          A: aCount,
+          B: gradeCounts.B,
+          C: gradeCounts.C,
+          D: gradeCounts.D,
+          E: gradeCounts.E,
+        },
+        required: {
+          A: validationRules.A.description,
+          "B+C": validationRules.BC.description,
+          "D+E": validationRules.DE.description,
+        },
+        totalEvaluated,
+        department,
+      },
+    };
+  }
+
+  // 检查D+E等级
+  if (deCount < validationRules.DE.min || deCount > validationRules.DE.max) {
+    return {
+      valid: false,
+      message: `${departmentName}部门：D等级（基本合格）+ E等级（不合格）人数应在${validationRules.DE.description}之间，当前为${deCount}人`,
+      details: {
+        current: {
+          A: aCount,
+          B: gradeCounts.B,
+          C: gradeCounts.C,
+          D: gradeCounts.D,
+          E: gradeCounts.E,
+        },
+        required: {
+          A: validationRules.A.description,
+          "B+C": validationRules.BC.description,
+          "D+E": validationRules.DE.description,
+        },
+        totalEvaluated,
+        department,
+      },
+    };
+  }
+
+  // 检查总人数是否合理
+  const expectedTotal = aCount + bcCount + deCount;
+  if (expectedTotal !== totalEvaluated) {
+    return {
+      valid: false,
+      message: `评价数据不一致，请检查所有人员是否都已评价`,
+      details: {
+        current: {
+          A: aCount,
+          B: gradeCounts.B,
+          C: gradeCounts.C,
+          D: gradeCounts.D,
+          E: gradeCounts.E,
+        },
+        required: {
+          A: validationRules.A.description,
+          "B+C": validationRules.BC.description,
+          "D+E": validationRules.DE.description,
+        },
+        totalEvaluated,
+        calculatedTotal: expectedTotal,
+        department,
+      },
+    };
+  }
+
+  return {
+    valid: true,
+    message: `${departmentName}部门等级分布符合要求`,
+    details: {
+      current: {
+        A: aCount,
+        B: gradeCounts.B,
+        C: gradeCounts.C,
+        D: gradeCounts.D,
+        E: gradeCounts.E,
+      },
+      required: {
+        A: validationRules.A.description,
+        "B+C": validationRules.BC.description,
+        "D+E": validationRules.DE.description,
+      },
+      totalEvaluated,
+      department,
+    },
+  };
+};
+
+// 获取等级分布建议
+export const getGradeDistributionSuggestions = (evaluations, department) => {
+  const validation = validateGradeDistribution(evaluations, department);
+  if (validation.valid) {
+    return [];
+  }
+
+  const suggestions = [];
+  const { current, required } = validation.details;
+
+  // 根据部门获取限制值
+  let limits;
+  if (department === "jingkong") {
+    limits = { A: 8, BC: { min: 39, max: 42 }, DE: { min: 3, max: 6 } };
+  } else if (department === "kaitou") {
+    limits = { A: 3, BC: { min: 15, max: 17 }, DE: { min: 1, max: 4 } };
+  } else {
+    return [];
+  }
+
+  // A等级过多
+  if (current.A > limits.A) {
+    suggestions.push({
+      type: "A过高",
+      message: `A等级人数过多，需要调整${current.A - limits.A}个`,
+      action: "降低部分A等级评分",
+    });
+  }
+
+  // B+C等级不在范围内
+  const bcCount = current.B + current.C;
+  if (bcCount < limits.BC.min) {
+    suggestions.push({
+      type: "B+C过低",
+      message: `B+C等级人数不足，需要调整${limits.BC.min - bcCount}个`,
+      action: "提高部分D/E等级评分",
+    });
+  } else if (bcCount > limits.BC.max) {
+    suggestions.push({
+      type: "B+C过高",
+      message: `B+C等级人数过多，需要调整${bcCount - limits.BC.max}个`,
+      action: "降低部分B/C等级评分",
+    });
+  }
+
+  // D+E等级不在范围内
+  const deCount = current.D + current.E;
+  if (deCount < limits.DE.min) {
+    // 检查是否已经有相同的建议（避免重复）
+    const hasSimilarSuggestion = suggestions.some((s) => s.type === "B+C过高");
+
+    if (!hasSimilarSuggestion) {
+      suggestions.push({
+        type: "D+E过低",
+        message: `D+E等级人数不足，需要调整${limits.DE.min - deCount}个`,
+        action: "降低部分B/C等级评分",
+      });
+    }
+  } else if (deCount > limits.DE.max) {
+    suggestions.push({
+      type: "D+E过高",
+      message: `D+E等级人数过多，需要调整${deCount - limits.DE.max}个`,
+      action: "提高部分D/E等级评分",
+    });
+  }
+
+  return suggestions;
+};

@@ -21,8 +21,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { getDeviceId } from "@/lib/deviceId";
-import { TrashIcon, AlertTriangleIcon, FilterIcon, XIcon } from "lucide-react";
-import { getScoreGrade, getGradeDetails } from "@/data/evaluationCriteria";
+import {
+  TrashIcon,
+  AlertTriangleIcon,
+  FilterIcon,
+  XIcon,
+  UploadIcon,
+} from "lucide-react";
+import {
+  getScoreGrade,
+  getGradeDetails,
+  validateGradeDistribution,
+  getGradeDistributionSuggestions,
+} from "@/data/evaluationCriteria";
+import { toast } from "sonner";
 
 export function VotePersonnelList({ department, role = "employee", onBack }) {
   const router = useRouter();
@@ -32,6 +44,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const [userId, setUserId] = useState("");
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // 初始化设备ID
   const initializeDeviceId = () => {
@@ -99,6 +112,109 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     );
     setUserEvaluations({});
     setClearAllDialogOpen(false);
+  };
+
+  // 提交所有评价到服务器
+  const submitAllEvaluations = async () => {
+    const currentDeviceId = userId || initializeDeviceId();
+    const localEvaluations = JSON.parse(
+      localStorage.getItem("localEvaluations") || "{}"
+    );
+
+    if (!localEvaluations[currentDeviceId]) {
+      toast.error("没有需要提交的评价");
+      return;
+    }
+
+    const userData = localEvaluations[currentDeviceId];
+    const evaluations = userData.evaluations;
+    const evaluationIds = Object.keys(evaluations);
+
+    if (evaluationIds.length === 0) {
+      toast.error("没有需要提交的评价");
+      return;
+    }
+
+    // 验证等级分布
+    const validation = validateGradeDistribution(userEvaluations, department);
+    if (!validation.valid) {
+      toast.error(`等级分布不符合要求！${validation.message}`);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const results = [];
+      const errors = [];
+
+      // 逐个提交评价到服务器
+      for (const [personnelId, evaluation] of Object.entries(evaluations)) {
+        try {
+          const response = await fetch("/api/evaluations", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId: currentDeviceId,
+              personnelId: personnelId,
+              department: evaluation.department,
+              role: evaluation.role,
+              scores: evaluation.scores,
+              totalScore: evaluation.totalScore,
+              comments: evaluation.comments || null,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            results.push(result.data);
+            // 标记为已提交
+            evaluation.submitted = true;
+            evaluation.submittedAt = new Date().toISOString();
+          } else {
+            errors.push({
+              personnelId,
+              error: result.error || "提交失败",
+            });
+          }
+        } catch (error) {
+          errors.push({
+            personnelId,
+            error: error.message || "网络错误",
+          });
+        }
+      }
+
+      // 创建新的 localEvaluations，只保留当前设备ID的数据
+      const newLocalEvaluations = {};
+      if (localEvaluations[currentDeviceId]) {
+        newLocalEvaluations[currentDeviceId] =
+          localEvaluations[currentDeviceId];
+      }
+
+      // 保存更新后的本地数据
+      localStorage.setItem(
+        "localEvaluations",
+        JSON.stringify(newLocalEvaluations)
+      );
+
+      if (errors.length === 0) {
+        toast.success(`所有评价提交成功！共提交 ${results.length} 个评价`);
+        // 跳转到成功页面
+        router.push("/vote/success");
+      } else {
+        toast.error(
+          `部分评价提交失败：成功 ${results.length} 个，失败 ${errors.length} 个`
+        );
+      }
+    } catch (error) {
+      console.error("批量提交失败:", error);
+      toast.error("批量提交失败");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getDepartmentName = () => {
@@ -218,8 +334,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-7xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+    <div className="flex-1 flex items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex-1 w-full max-w-7xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
         <div className="w-full space-y-6">
           {/* 标题和导航 */}
           <div className="flex items-center justify-between">
@@ -294,7 +410,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
             return null;
           })()}
 
-          {/* 人员统计和等级过滤 */}
+          {/* 人员统计和等级分布状态 */}
           <div className="space-y-4">
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span>共 {personnel.length} 人</span>
@@ -313,61 +429,238 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               </Button>
             </div>
 
-            {/* 等级过滤器 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">等级过滤</CardTitle>
-                  {selectedGrade && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearGradeFilter}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      <XIcon className="w-4 h-4 mr-1" />
-                      清除过滤
-                    </Button>
-                  )}
-                </div>
-                <CardDescription>
-                  点击等级标签可以过滤对应等级的人员
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {getGradeDetails().map((grade) => {
-                    const stats = getGradeStatistics();
-                    const gradeStats = stats[grade.letter];
-                    const isSelected = selectedGrade === grade.letter;
-
-                    return (
-                      <Button
-                        key={grade.letter}
-                        variant={isSelected ? "default" : "outline"}
-                        size="sm"
-                        onClick={() =>
-                          setSelectedGrade(isSelected ? null : grade.letter)
-                        }
-                        className={`flex items-center gap-2 ${
-                          isSelected ? "" : grade.color
-                        }`}
-                      >
-                        <span className="font-medium">{grade.letter}</span>
-                        <span className="text-xs">({gradeStats.count})</span>
-                      </Button>
+            {/* 等级分布状态 - 仅对经控贸易部门显示 */}
+            {(department === "jingkong" || department === "kaitou") &&
+              Object.keys(userEvaluations).length > 0 && (
+                <Card
+                  className={(() => {
+                    const validation = validateGradeDistribution(
+                      userEvaluations,
+                      department
                     );
-                  })}
+                    return validation.valid
+                      ? "border-green-200 bg-green-50"
+                      : "border-red-200 bg-red-50";
+                  })()}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        等级分布状态
+                        {(() => {
+                          const validation = validateGradeDistribution(
+                            userEvaluations,
+                            department
+                          );
+                          return validation.valid ? (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              ✓ 符合要求
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              ⚠ 需要调整
+                            </span>
+                          );
+                        })()}
+                      </CardTitle>
+                      {(() => {
+                        const validation = validateGradeDistribution(
+                          userEvaluations,
+                          department
+                        );
+                        return (
+                          validation.valid && (
+                            <Button
+                              onClick={submitAllEvaluations}
+                              disabled={submitting}
+                              className="bg-green-600 hover:bg-green-700"
+                              size="sm"
+                            >
+                              {submitting ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <>
+                                  <UploadIcon className="w-4 h-4 mr-2" />
+                                  提交评价
+                                </>
+                              )}
+                            </Button>
+                          )
+                        );
+                      })()}
+                    </div>
+                    <CardDescription>
+                      {department === "jingkong"
+                        ? "经控贸易部门等级分布要求：A≤8人，B+C=39-42人，D+E=3-6人"
+                        : "开投贸易部门等级分布要求：A≤3人，B+C=15-17人，D+E=1-4人"}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {/* 当前分布统计 */}
+                      <div className="grid grid-cols-5 gap-2 text-center">
+                        {getGradeDetails().map((grade) => {
+                          const stats = getGradeStatistics();
+                          const gradeStats = stats[grade.letter];
+                          return (
+                            <div
+                              key={grade.letter}
+                              className="bg-white p-2 rounded border"
+                            >
+                              <div
+                                className={`font-bold text-lg ${grade.color}`}
+                              >
+                                {grade.letter}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {gradeStats.count}人
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* 分布要求对比 */}
+                      <div className="bg-white p-3 rounded border text-sm">
+                        <div className="font-medium mb-2">分布要求对比：</div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span>A等级（优秀）：</span>
+                            <span
+                              className={(() => {
+                                const stats = getGradeStatistics();
+                                const limit = department === "jingkong" ? 8 : 3;
+                                return stats.A.count <= limit
+                                  ? "text-green-600"
+                                  : "text-red-600";
+                              })()}
+                            >
+                              {getGradeStatistics().A.count}人 /{" "}
+                              {department === "jingkong" ? "≤8人" : "≤3人"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>B+C等级（良好+合格）：</span>
+                            <span
+                              className={(() => {
+                                const stats = getGradeStatistics();
+                                const bcCount = stats.B.count + stats.C.count;
+                                const isValid =
+                                  department === "jingkong"
+                                    ? bcCount >= 39 && bcCount <= 42
+                                    : bcCount >= 15 && bcCount <= 17;
+                                return isValid
+                                  ? "text-green-600"
+                                  : "text-red-600";
+                              })()}
+                            >
+                              {getGradeStatistics().B.count +
+                                getGradeStatistics().C.count}
+                              人 /{" "}
+                              {department === "jingkong"
+                                ? "39-42人"
+                                : "15-17人"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>D+E等级（基本合格+不合格）：</span>
+                            <span
+                              className={(() => {
+                                const stats = getGradeStatistics();
+                                const deCount = stats.D.count + stats.E.count;
+                                const isValid =
+                                  department === "jingkong"
+                                    ? deCount >= 3 && deCount <= 6
+                                    : deCount >= 1 && deCount <= 4;
+                                return isValid
+                                  ? "text-green-600"
+                                  : "text-red-600";
+                              })()}
+                            >
+                              {getGradeStatistics().D.count +
+                                getGradeStatistics().E.count}
+                              人 /{" "}
+                              {department === "jingkong" ? "3-6人" : "1-4人"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 调整建议 */}
+                      {(() => {
+                        const validation = validateGradeDistribution(
+                          userEvaluations,
+                          department
+                        );
+                        if (!validation.valid) {
+                          const suggestions = getGradeDistributionSuggestions(
+                            userEvaluations,
+                            department
+                          );
+                          return (
+                            <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                              <div className="font-medium text-yellow-800 mb-2">
+                                调整建议：
+                              </div>
+                              <div className="space-y-1 text-sm text-yellow-700">
+                                {suggestions.map((suggestion, index) => (
+                                  <div key={index}>• {suggestion.message}</div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+            {/* 等级过滤器 */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="text-sm font-medium text-gray-700">
+                等级过滤:
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {getGradeDetails().map((grade) => {
+                  const stats = getGradeStatistics();
+                  const gradeStats = stats[grade.letter];
+                  const isSelected = selectedGrade === grade.letter;
+
+                  return (
+                    <Button
+                      key={grade.letter}
+                      variant={isSelected ? "default" : "outline"}
+                      size="sm"
+                      onClick={() =>
+                        setSelectedGrade(isSelected ? null : grade.letter)
+                      }
+                      className={`h-8 px-3 text-xs ${
+                        isSelected ? "" : grade.color
+                      }`}
+                    >
+                      {grade.letter}({gradeStats.count})
+                    </Button>
+                  );
+                })}
+              </div>
+              {selectedGrade && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>
+                    当前: {selectedGrade}等级 ({filteredPersonnel.length}人)
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearGradeFilter}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <XIcon className="w-3 h-3" />
+                  </Button>
                 </div>
-                {selectedGrade && (
-                  <div className="mt-3 text-sm text-gray-600">
-                    当前过滤:{" "}
-                    <span className="font-medium">{selectedGrade}</span> 等级 -
-                    显示 {filteredPersonnel.length} 人
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </div>
 
           {/* 人员列表 */}
@@ -484,6 +777,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           )}
         </div>
       </main>
+
+      {/* 全屏提交loading */}
+      {submitting && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center flex flex-col items-center justify-center shadow-lg">
+            <LoadingSpinner size="lg" />
+            <h3 className="text-xl font-semibold mt-4 mb-2">正在提交</h3>
+            <p className="text-gray-600">请不要操作，正在保存所有评价数据...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

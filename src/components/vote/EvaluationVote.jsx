@@ -15,6 +15,8 @@ import {
   defaultCriteria,
   calculateTotalScore as calculateScore,
   getScoreGrade,
+  validateGradeDistribution,
+  getGradeDistributionSuggestions,
 } from "@/data/evaluationCriteria";
 import { getDeviceId } from "@/lib/deviceId";
 
@@ -504,18 +506,14 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       // 保存到本地存储
       saveEvaluationToLocal(selectedPerson, evaluations, totalScore);
 
-      // 更新本地评价数据以反映当前状态
-      const localEvaluations = loadEvaluationsFromLocal();
-      const updatedEvaluations = {
-        ...localEvaluations,
-        ...userEvaluations,
-      };
-      setUserEvaluations(updatedEvaluations);
+      // 重新加载最新的本地评价数据
+      const latestEvaluations = loadEvaluationsFromLocal();
+
+      // 更新状态以触发重新渲染
+      setUserEvaluations(latestEvaluations);
 
       toast.success(`评价已重新保存！总分：${totalScore}分`);
-      setTimeout(() => {
-        window.location.href = `/vote/${department}`;
-      }, 1000);
+      // 不跳转，让用户继续在当前页面
     } catch (error) {
       console.error("评价保存失败:", error);
       toast.error(error.message || "评价保存失败");
@@ -543,13 +541,46 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       // 先保存当前评价到本地存储
       saveEvaluationToLocal(selectedPerson, evaluations, totalScore);
 
-      // 更新本地评价数据以反映当前状态
-      const localEvaluations = loadEvaluationsFromLocal();
-      const updatedEvaluations = {
-        ...localEvaluations,
-        ...userEvaluations,
-      };
-      setUserEvaluations(updatedEvaluations);
+      // 重新加载最新的本地评价数据
+      const latestEvaluations = loadEvaluationsFromLocal();
+
+      // 更新状态以触发重新渲染
+      setUserEvaluations(latestEvaluations);
+
+      // 验证等级分布（对经控贸易和开投贸易部门）
+      if (department === "jingkong" || department === "kaitou") {
+        const validation = validateGradeDistribution(
+          latestEvaluations,
+          department
+        );
+
+        if (!validation.valid) {
+          // 显示详细的错误信息
+          const suggestions = getGradeDistributionSuggestions(
+            latestEvaluations,
+            department
+          );
+          const suggestionText =
+            suggestions.length > 0
+              ? suggestions.map((s) => `• ${s.message}`).join("\n")
+              : "";
+
+          toast.error(
+            `等级分布不符合要求！\n${validation.message}\n\n调整建议：\n${suggestionText}`,
+            {
+              duration: 8000,
+              style: {
+                whiteSpace: "pre-line",
+                maxWidth: "500px",
+              },
+            }
+          );
+
+          // 在控制台输出详细信息供调试
+          console.log("等级分布验证失败:", validation.details);
+          return;
+        }
+      }
 
       // 显示全屏loading并保存所有本地存储的评价
       setSubmitting(true);
@@ -605,18 +636,15 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   };
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="flex-1 space-y-6 w-full">
       {/* 标题和导航 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-start">
         <div>
           <h1 className="text-3xl font-semibold">
             {getDepartmentName()} - 人员评价系统
           </h1>
           <p className="text-gray-600 mt-2">基于多维度评分标准的人员评价系统</p>
         </div>
-        <Button variant="outline" onClick={onBack}>
-          ← 返回人员选择
-        </Button>
       </div>
 
       {/* 初始加载状态 */}
@@ -884,6 +912,17 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                       return null;
                     })()}
 
+                    {/* 返回人员列表按钮 */}
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        window.location.href = `/vote/${department}/${getCurrentRole()}`;
+                      }}
+                      className="w-full"
+                    >
+                      返回总览
+                    </Button>
+
                     {/* 提交按钮 */}
                     <div className="space-y-2">
                       {/* 保存到本地并下一个按钮 - 仅在不是最后一个人时显示 */}
@@ -908,7 +947,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                           disabled={getButtonDisabled()}
                           className="w-full bg-green-600 hover:bg-green-700"
                         >
-                          {loading ? <LoadingSpinner size="sm" /> : "重新保存"}
+                          {loading ? <LoadingSpinner size="sm" /> : "保存"}
                         </Button>
                       )}
 
