@@ -471,8 +471,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                     <div className="space-y-1">
                       <div>
                         {department === "jingkong"
-                          ? "经控贸易部门等级分布要求：A≤8人，B+C=40-44人，D+E=3-6人"
-                          : "开投贸易部门等级分布要求：A≤3人，B+C=15-17人，D+E=1-4人"}
+                          ? "经控贸易部门等级分布要求：A优秀≤11人，B良好=23-26人，C合格=18-21人，D基本合格+E不合格=3-6人"
+                          : "开投贸易部门等级分布要求：A优秀≤3人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人"}
                       </div>
                       {department === "jingkong" && (
                         <div className="text-blue-600 font-medium">
@@ -519,35 +519,52 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
-                              const limit = department === "jingkong" ? 8 : 3;
+                              const limit = department === "jingkong" ? 11 : 3;
                               return stats.A.count <= limit
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().A.count}人 /{" "}
-                            {department === "jingkong" ? "≤8人" : "≤3人"}
+                            {department === "jingkong" ? "≤11人" : "≤3人"}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>B+C等级（良好+合格）：</span>
+                          <span>B等级（良好）：</span>
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
-                              const bcCount = stats.B.count + stats.C.count;
+                              const bCount = stats.B.count;
                               const isValid =
                                 department === "jingkong"
-                                  ? bcCount >= 40 && bcCount <= 44
-                                  : bcCount >= 15 && bcCount <= 17;
+                                  ? bCount >= 23 && bCount <= 26
+                                  : bCount >= 9 && bCount <= 11;
                               return isValid
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
-                            {getGradeStatistics().B.count +
-                              getGradeStatistics().C.count}
-                            人 /{" "}
-                            {department === "jingkong" ? "40-44人" : "15-17人"}
+                            {getGradeStatistics().B.count}人 /{" "}
+                            {department === "jingkong" ? "23-26人" : "9-11人"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>C等级（合格）：</span>
+                          <span
+                            className={(() => {
+                              const stats = getGradeStatistics();
+                              const cCount = stats.C.count;
+                              const isValid =
+                                department === "jingkong"
+                                  ? cCount >= 18 && cCount <= 21
+                                  : cCount >= 6 && cCount <= 8;
+                              return isValid
+                                ? "text-green-600"
+                                : "text-red-600";
+                            })()}
+                          >
+                            {getGradeStatistics().C.count}人 /{" "}
+                            {department === "jingkong" ? "18-21人" : "6-8人"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -559,7 +576,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                               const isValid =
                                 department === "jingkong"
                                   ? deCount >= 3 && deCount <= 6
-                                  : deCount >= 1 && deCount <= 4;
+                                  : deCount >= 1 && deCount <= 3;
                               return isValid
                                 ? "text-green-600"
                                 : "text-red-600";
@@ -567,7 +584,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           >
                             {getGradeStatistics().D.count +
                               getGradeStatistics().E.count}
-                            人 / {department === "jingkong" ? "3-6人" : "1-4人"}
+                            人 / {department === "jingkong" ? "3-6人" : "1-3人"}
                           </span>
                         </div>
                       </div>

@@ -195,7 +195,7 @@ export const getGradeDetails = () => {
       grade: "优秀",
       letter: "A",
       color: "text-green-600",
-      description: "95分≤优秀≤100分，优秀要≦7，B良好",
+      description: "95分≤优秀≤100分，经控贸易A≤11人，开投贸易A≤3人",
     },
     {
       min: 85,
@@ -203,7 +203,7 @@ export const getGradeDetails = () => {
       grade: "良好",
       letter: "B",
       color: "text-blue-600",
-      description: "85分≤良好<95分，C合格≦34-37",
+      description: "85分≤良好<95分，经控贸易B=23-26人，开投贸易B=9-11人",
     },
     {
       min: 75,
@@ -211,7 +211,7 @@ export const getGradeDetails = () => {
       grade: "合格",
       letter: "C",
       color: "text-yellow-600",
-      description: "75分≤合格<85分，D基本合格E不合格≧5%",
+      description: "75分≤合格<85分，经控贸易C=18-21人，开投贸易C=6-8人",
     },
     {
       min: 65,
@@ -219,7 +219,7 @@ export const getGradeDetails = () => {
       grade: "基本合格",
       letter: "D",
       color: "text-orange-600",
-      description: "65分≤基本合格<75分，E不合格≧3-6",
+      description: "65分≤基本合格<75分，经控贸易D+E=3-6人，开投贸易D+E=1-3人",
     },
     {
       min: 0,
@@ -227,7 +227,7 @@ export const getGradeDetails = () => {
       grade: "不合格",
       letter: "E",
       color: "text-red-600",
-      description: "65分以下为不合格",
+      description: "65分以下为不合格，与D等级合并计算分布",
     },
   ];
 };
@@ -241,8 +241,9 @@ export const validateGradeDistribution = (evaluations, department) => {
   if (department === "jingkong") {
     // 经控贸易部门规则
     validationRules = {
-      A: { max: 8, description: "≤8人" },
-      BC: { min: 40, max: 44, description: "40-44人" },
+      A: { max: 11, description: "≤11人" },
+      B: { min: 23, max: 26, description: "23-26人" },
+      C: { min: 18, max: 21, description: "18-21人" },
       DE: { min: 3, max: 6, description: "3-6人" },
     };
     departmentName = "经控贸易";
@@ -250,8 +251,9 @@ export const validateGradeDistribution = (evaluations, department) => {
     // 开投贸易部门规则
     validationRules = {
       A: { max: 3, description: "≤3人" },
-      BC: { min: 15, max: 17, description: "15-17人" },
-      DE: { min: 1, max: 4, description: "1-4人" },
+      B: { min: 9, max: 11, description: "9-11人" },
+      C: { min: 6, max: 8, description: "6-8人" },
+      DE: { min: 1, max: 3, description: "1-3人" },
     };
     departmentName = "开投贸易";
   } else {
@@ -277,7 +279,8 @@ export const validateGradeDistribution = (evaluations, department) => {
   const totalEvaluated = Object.keys(evaluations).length;
 
   const aCount = gradeCounts.A;
-  const bcCount = gradeCounts.B + gradeCounts.C;
+  const bCount = gradeCounts.B;
+  const cCount = gradeCounts.C;
   const deCount = gradeCounts.D + gradeCounts.E;
 
   // 检查A等级
@@ -288,14 +291,15 @@ export const validateGradeDistribution = (evaluations, department) => {
       details: {
         current: {
           A: aCount,
-          B: gradeCounts.B,
-          C: gradeCounts.C,
+          B: bCount,
+          C: cCount,
           D: gradeCounts.D,
           E: gradeCounts.E,
         },
         required: {
           A: validationRules.A.description,
-          "B+C": validationRules.BC.description,
+          B: validationRules.B.description,
+          C: validationRules.C.description,
           "D+E": validationRules.DE.description,
         },
         totalEvaluated,
@@ -304,22 +308,48 @@ export const validateGradeDistribution = (evaluations, department) => {
     };
   }
 
-  // 检查B+C等级
-  if (bcCount < validationRules.BC.min || bcCount > validationRules.BC.max) {
+  // 检查B等级
+  if (bCount < validationRules.B.min || bCount > validationRules.B.max) {
     return {
       valid: false,
-      message: `${departmentName}部门：B等级（良好）+ C等级（合格）人数应在${validationRules.BC.description}之间，当前为${bcCount}人`,
+      message: `${departmentName}部门：B等级（良好）人数应在${validationRules.B.description}之间，当前为${bCount}人`,
       details: {
         current: {
           A: aCount,
-          B: gradeCounts.B,
-          C: gradeCounts.C,
+          B: bCount,
+          C: cCount,
           D: gradeCounts.D,
           E: gradeCounts.E,
         },
         required: {
           A: validationRules.A.description,
-          "B+C": validationRules.BC.description,
+          B: validationRules.B.description,
+          C: validationRules.C.description,
+          "D+E": validationRules.DE.description,
+        },
+        totalEvaluated,
+        department,
+      },
+    };
+  }
+
+  // 检查C等级
+  if (cCount < validationRules.C.min || cCount > validationRules.C.max) {
+    return {
+      valid: false,
+      message: `${departmentName}部门：C等级（合格）人数应在${validationRules.C.description}之间，当前为${cCount}人`,
+      details: {
+        current: {
+          A: aCount,
+          B: bCount,
+          C: cCount,
+          D: gradeCounts.D,
+          E: gradeCounts.E,
+        },
+        required: {
+          A: validationRules.A.description,
+          B: validationRules.B.description,
+          C: validationRules.C.description,
           "D+E": validationRules.DE.description,
         },
         totalEvaluated,
@@ -336,14 +366,15 @@ export const validateGradeDistribution = (evaluations, department) => {
       details: {
         current: {
           A: aCount,
-          B: gradeCounts.B,
-          C: gradeCounts.C,
+          B: bCount,
+          C: cCount,
           D: gradeCounts.D,
           E: gradeCounts.E,
         },
         required: {
           A: validationRules.A.description,
-          "B+C": validationRules.BC.description,
+          B: validationRules.B.description,
+          C: validationRules.C.description,
           "D+E": validationRules.DE.description,
         },
         totalEvaluated,
@@ -353,7 +384,7 @@ export const validateGradeDistribution = (evaluations, department) => {
   }
 
   // 检查总人数是否合理
-  const expectedTotal = aCount + bcCount + deCount;
+  const expectedTotal = aCount + bCount + cCount + deCount;
   if (expectedTotal !== totalEvaluated) {
     return {
       valid: false,
@@ -361,14 +392,15 @@ export const validateGradeDistribution = (evaluations, department) => {
       details: {
         current: {
           A: aCount,
-          B: gradeCounts.B,
-          C: gradeCounts.C,
+          B: bCount,
+          C: cCount,
           D: gradeCounts.D,
           E: gradeCounts.E,
         },
         required: {
           A: validationRules.A.description,
-          "B+C": validationRules.BC.description,
+          B: validationRules.B.description,
+          C: validationRules.C.description,
           "D+E": validationRules.DE.description,
         },
         totalEvaluated,
@@ -384,14 +416,15 @@ export const validateGradeDistribution = (evaluations, department) => {
     details: {
       current: {
         A: aCount,
-        B: gradeCounts.B,
-        C: gradeCounts.C,
+        B: bCount,
+        C: cCount,
         D: gradeCounts.D,
         E: gradeCounts.E,
       },
       required: {
         A: validationRules.A.description,
-        "B+C": validationRules.BC.description,
+        B: validationRules.B.description,
+        C: validationRules.C.description,
         "D+E": validationRules.DE.description,
       },
       totalEvaluated,
@@ -413,9 +446,19 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
   // 根据部门获取限制值
   let limits;
   if (department === "jingkong") {
-    limits = { A: 8, BC: { min: 40, max: 44 }, DE: { min: 3, max: 6 } };
+    limits = {
+      A: 11,
+      B: { min: 23, max: 26 },
+      C: { min: 18, max: 21 },
+      DE: { min: 3, max: 6 },
+    };
   } else if (department === "kaitou") {
-    limits = { A: 3, BC: { min: 15, max: 17 }, DE: { min: 1, max: 4 } };
+    limits = {
+      A: 3,
+      B: { min: 9, max: 11 },
+      C: { min: 6, max: 8 },
+      DE: { min: 1, max: 3 },
+    };
   } else {
     return [];
   }
@@ -429,19 +472,38 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
     });
   }
 
-  // B+C等级不在范围内
-  const bcCount = current.B + current.C;
-  if (bcCount < limits.BC.min) {
+  // B等级不在范围内
+  if (current.B < limits.B.min) {
     suggestions.push({
-      type: "B+C过低",
-      message: `B+C等级人数不足，需要调整${limits.BC.min - bcCount}个`,
-      action: "提高部分D/E等级评分",
+      type: "B过低",
+      message: `B等级人数不足，需要调整${limits.B.min - current.B}个`,
+      action: "提高部分C/D/E等级评分",
     });
-  } else if (bcCount > limits.BC.max) {
+  } else if (current.B > limits.B.max) {
     suggestions.push({
-      type: "B+C过高",
-      message: `B+C等级人数过多，需要调整${bcCount - limits.BC.max}个`,
-      action: "降低部分B/C等级评分",
+      type: "B过高",
+      message: `B等级人数过多，需要调整${current.B - limits.B.max}个`,
+      action: "降低部分B等级评分",
+    });
+  }
+
+  // C等级不在范围内
+  if (current.C < limits.C.min) {
+    // 检查是否已经有相同的建议（避免重复）
+    const hasSimilarSuggestion = suggestions.some((s) => s.type === "B过高");
+
+    if (!hasSimilarSuggestion) {
+      suggestions.push({
+        type: "C过低",
+        message: `C等级人数不足，需要调整${limits.C.min - current.C}个`,
+        action: "提高部分D/E等级评分",
+      });
+    }
+  } else if (current.C > limits.C.max) {
+    suggestions.push({
+      type: "C过高",
+      message: `C等级人数过多，需要调整${current.C - limits.C.max}个`,
+      action: "降低部分C等级评分",
     });
   }
 
@@ -449,7 +511,9 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
   const deCount = current.D + current.E;
   if (deCount < limits.DE.min) {
     // 检查是否已经有相同的建议（避免重复）
-    const hasSimilarSuggestion = suggestions.some((s) => s.type === "B+C过高");
+    const hasSimilarSuggestion = suggestions.some(
+      (s) => s.type === "B过高" || s.type === "C过高"
+    );
 
     if (!hasSimilarSuggestion) {
       suggestions.push({
