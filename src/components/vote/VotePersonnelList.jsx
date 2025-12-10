@@ -34,6 +34,7 @@ import {
   validateGradeDistribution,
   getGradeDistributionSuggestions,
 } from "@/data/evaluationCriteria";
+import { getPersonnelByDepartment } from "@/data/personnelData";
 import { toast } from "sonner";
 
 export function VotePersonnelList({ department, role = "employee", onBack }) {
@@ -144,70 +145,57 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
     setSubmitting(true);
     try {
-      const results = [];
-      const errors = [];
-
-      // 逐个提交评价到服务器
-      for (const [personnelId, evaluation] of Object.entries(evaluations)) {
-        try {
-          const response = await fetch("/api/evaluations", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              userId: currentDeviceId,
-              personnelId: personnelId,
-              department: evaluation.department,
-              role: evaluation.role,
-              scores: evaluation.scores,
-              totalScore: evaluation.totalScore,
-              comments: evaluation.comments || null,
-            }),
-          });
-
-          const result = await response.json();
-
-          if (result.success) {
-            results.push(result.data);
-            // 标记为已提交
-            evaluation.submitted = true;
-            evaluation.submittedAt = new Date().toISOString();
-          } else {
-            errors.push({
-              personnelId,
-              error: result.error || "提交失败",
-            });
-          }
-        } catch (error) {
-          errors.push({
-            personnelId,
-            error: error.message || "网络错误",
-          });
-        }
-      }
-
-      // 创建新的 localEvaluations，只保留当前设备ID的数据
-      const newLocalEvaluations = {};
-      if (localEvaluations[currentDeviceId]) {
-        newLocalEvaluations[currentDeviceId] =
-          localEvaluations[currentDeviceId];
-      }
-
-      // 保存更新后的本地数据
-      localStorage.setItem(
-        "localEvaluations",
-        JSON.stringify(newLocalEvaluations)
+      // 准备批量提交的数据
+      const batchEvaluations = Object.entries(evaluations).map(
+        ([personnelId, evaluation]) => ({
+          userId: currentDeviceId,
+          personnelId: personnelId,
+          department: evaluation.department,
+          role: evaluation.role,
+          scores: evaluation.scores,
+          totalScore: evaluation.totalScore,
+          comments: evaluation.comments || null,
+        })
       );
 
-      if (errors.length === 0) {
-        toast.success(`所有评价提交成功！共提交 ${results.length} 个评价`);
+      // 批量提交评价到服务器
+      const response = await fetch("/api/evaluations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          batch: true,
+          evaluations: batchEvaluations,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 标记所有评价为已提交
+        Object.keys(evaluations).forEach((personnelId) => {
+          evaluations[personnelId].submitted = true;
+          evaluations[personnelId].submittedAt = new Date().toISOString();
+        });
+
+        // 保存更新后的本地数据
+        localStorage.setItem(
+          "localEvaluations",
+          JSON.stringify(localEvaluations)
+        );
+
+        toast.success(
+          result.message ||
+            `所有评价提交成功！共提交 ${result.results?.length || 0} 个评价`
+        );
         // 跳转到成功页面
         router.push("/vote/success");
       } else {
-        toast.error(
-          `部分评价提交失败：成功 ${results.length} 个，失败 ${errors.length} 个`
-        );
+        toast.error(result.message || "批量提交失败");
+        if (result.errors && result.errors.length > 0) {
+          console.error("提交错误:", result.errors);
+        }
       }
     } catch (error) {
       console.error("批量提交失败:", error);
@@ -225,30 +213,20 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return names[department] || department;
   };
 
-  // 获取部门人员（从API）
+  // 获取部门人员（从本地数据）
   const fetchPersonnel = async () => {
     try {
-      const response = await fetch(`/api/personnel?department=${department}`);
+      // 使用本地人员数据
+      const personnelData = await getPersonnelByDepartment(department);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // 为每个人员添加额外的属性
-          const personnelObjects = (result.data || []).map((person) => ({
-            ...person,
-            type: getDepartmentName(),
-            department: getDepartmentName(),
-          }));
+      // 为每个人员添加额外的属性
+      const personnelObjects = personnelData.map((person) => ({
+        ...person,
+        type: getDepartmentName(),
+        department: getDepartmentName(),
+      }));
 
-          setPersonnel(personnelObjects);
-        } else {
-          console.error("获取人员数据失败:", result.error);
-          setPersonnel([]);
-        }
-      } else {
-        console.error("获取人员数据失败");
-        setPersonnel([]);
-      }
+      setPersonnel(personnelObjects);
     } catch (error) {
       console.error("获取人员失败:", error);
       // 如果获取失败，设置为空数组
@@ -430,192 +408,201 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
             </div>
 
             {/* 等级分布状态 - 仅对经控贸易部门显示 */}
-            {(department === "jingkong" || department === "kaitou") &&
-              Object.keys(userEvaluations).length > 0 && (
-                <Card
-                  className={(() => {
-                    const validation = validateGradeDistribution(
-                      userEvaluations,
-                      department
-                    );
-                    return validation.valid
-                      ? "border-green-200 bg-green-50"
-                      : "border-red-200 bg-red-50";
-                  })()}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        等级分布状态
-                        {(() => {
-                          const validation = validateGradeDistribution(
-                            userEvaluations,
-                            department
-                          );
-                          return validation.valid ? (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ 符合要求
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ⚠ 需要调整
-                            </span>
-                          );
-                        })()}
-                      </CardTitle>
+            {(department === "jingkong" || department === "kaitou") && (
+              <Card
+                className={(() => {
+                  const validation = validateGradeDistribution(
+                    userEvaluations,
+                    department
+                  );
+                  return validation.valid
+                    ? "border-green-200 bg-green-50"
+                    : "border-red-200 bg-red-50";
+                })()}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      等级分布状态
                       {(() => {
                         const validation = validateGradeDistribution(
+                          userEvaluations,
+                          department
+                        );
+                        return validation.valid ? (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✓ 符合要求
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            ⚠ 需要调整
+                          </span>
+                        );
+                      })()}
+                    </CardTitle>
+                    {(() => {
+                      const validation = validateGradeDistribution(
+                        userEvaluations,
+                        department
+                      );
+                      return (
+                        validation.valid &&
+                        Object.keys(userEvaluations).length > 0 && (
+                          <Button
+                            onClick={submitAllEvaluations}
+                            disabled={submitting}
+                            className="bg-green-600 hover:bg-green-700"
+                            size="sm"
+                          >
+                            {submitting ? (
+                              <LoadingSpinner size="sm" />
+                            ) : (
+                              <>
+                                <UploadIcon className="w-4 h-4 mr-2" />
+                                提交评价
+                              </>
+                            )}
+                          </Button>
+                        )
+                      );
+                    })()}
+                  </div>
+                  <CardDescription>
+                    <div className="space-y-1">
+                      <div>
+                        {department === "jingkong"
+                          ? "经控贸易部门等级分布要求：A≤8人，B+C=39-42人，D+E=3-6人"
+                          : "开投贸易部门等级分布要求：A≤3人，B+C=15-17人，D+E=1-4人"}
+                      </div>
+                      {department === "jingkong" && (
+                        <div className="text-blue-600 font-medium">
+                          绩效考核最终成绩＝部门负责人评估成绩×70%＋其他员工评估成绩×30%
+                        </div>
+                      )}
+                      {department === "kaitou" && (
+                        <div className="text-green-600 font-medium">
+                          绩效考核最终成绩＝部门负责人评估成绩（业务板块负责人、职能部门负责人）×70%＋其他员工评估成绩×30%
+                        </div>
+                      )}
+                    </div>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* 当前分布统计 */}
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      {getGradeDetails().map((grade) => {
+                        const stats = getGradeStatistics();
+                        const gradeStats = stats[grade.letter];
+                        return (
+                          <div
+                            key={grade.letter}
+                            className="bg-white p-2 rounded border"
+                          >
+                            <div className={`font-bold text-lg ${grade.color}`}>
+                              {grade.letter}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {gradeStats.count}人
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 分布要求对比 */}
+                    <div className="bg-white p-3 rounded border text-sm">
+                      <div className="font-medium mb-2">分布要求对比：</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span>A等级（优秀）：</span>
+                          <span
+                            className={(() => {
+                              const stats = getGradeStatistics();
+                              const limit = department === "jingkong" ? 8 : 3;
+                              return stats.A.count <= limit
+                                ? "text-green-600"
+                                : "text-red-600";
+                            })()}
+                          >
+                            {getGradeStatistics().A.count}人 /{" "}
+                            {department === "jingkong" ? "≤8人" : "≤3人"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>B+C等级（良好+合格）：</span>
+                          <span
+                            className={(() => {
+                              const stats = getGradeStatistics();
+                              const bcCount = stats.B.count + stats.C.count;
+                              const isValid =
+                                department === "jingkong"
+                                  ? bcCount >= 39 && bcCount <= 42
+                                  : bcCount >= 15 && bcCount <= 17;
+                              return isValid
+                                ? "text-green-600"
+                                : "text-red-600";
+                            })()}
+                          >
+                            {getGradeStatistics().B.count +
+                              getGradeStatistics().C.count}
+                            人 /{" "}
+                            {department === "jingkong" ? "39-42人" : "15-17人"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>D+E等级（基本合格+不合格）：</span>
+                          <span
+                            className={(() => {
+                              const stats = getGradeStatistics();
+                              const deCount = stats.D.count + stats.E.count;
+                              const isValid =
+                                department === "jingkong"
+                                  ? deCount >= 3 && deCount <= 6
+                                  : deCount >= 1 && deCount <= 4;
+                              return isValid
+                                ? "text-green-600"
+                                : "text-red-600";
+                            })()}
+                          >
+                            {getGradeStatistics().D.count +
+                              getGradeStatistics().E.count}
+                            人 / {department === "jingkong" ? "3-6人" : "1-4人"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 调整建议 */}
+                    {(() => {
+                      const validation = validateGradeDistribution(
+                        userEvaluations,
+                        department
+                      );
+                      if (!validation.valid) {
+                        const suggestions = getGradeDistributionSuggestions(
                           userEvaluations,
                           department
                         );
                         return (
-                          validation.valid && (
-                            <Button
-                              onClick={submitAllEvaluations}
-                              disabled={submitting}
-                              className="bg-green-600 hover:bg-green-700"
-                              size="sm"
-                            >
-                              {submitting ? (
-                                <LoadingSpinner size="sm" />
-                              ) : (
-                                <>
-                                  <UploadIcon className="w-4 h-4 mr-2" />
-                                  提交评价
-                                </>
-                              )}
-                            </Button>
-                          )
-                        );
-                      })()}
-                    </div>
-                    <CardDescription>
-                      {department === "jingkong"
-                        ? "经控贸易部门等级分布要求：A≤8人，B+C=39-42人，D+E=3-6人"
-                        : "开投贸易部门等级分布要求：A≤3人，B+C=15-17人，D+E=1-4人"}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {/* 当前分布统计 */}
-                      <div className="grid grid-cols-5 gap-2 text-center">
-                        {getGradeDetails().map((grade) => {
-                          const stats = getGradeStatistics();
-                          const gradeStats = stats[grade.letter];
-                          return (
-                            <div
-                              key={grade.letter}
-                              className="bg-white p-2 rounded border"
-                            >
-                              <div
-                                className={`font-bold text-lg ${grade.color}`}
-                              >
-                                {grade.letter}
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                {gradeStats.count}人
-                              </div>
+                          <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                            <div className="font-medium text-yellow-800 mb-2">
+                              调整建议：
                             </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* 分布要求对比 */}
-                      <div className="bg-white p-3 rounded border text-sm">
-                        <div className="font-medium mb-2">分布要求对比：</div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span>A等级（优秀）：</span>
-                            <span
-                              className={(() => {
-                                const stats = getGradeStatistics();
-                                const limit = department === "jingkong" ? 8 : 3;
-                                return stats.A.count <= limit
-                                  ? "text-green-600"
-                                  : "text-red-600";
-                              })()}
-                            >
-                              {getGradeStatistics().A.count}人 /{" "}
-                              {department === "jingkong" ? "≤8人" : "≤3人"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>B+C等级（良好+合格）：</span>
-                            <span
-                              className={(() => {
-                                const stats = getGradeStatistics();
-                                const bcCount = stats.B.count + stats.C.count;
-                                const isValid =
-                                  department === "jingkong"
-                                    ? bcCount >= 39 && bcCount <= 42
-                                    : bcCount >= 15 && bcCount <= 17;
-                                return isValid
-                                  ? "text-green-600"
-                                  : "text-red-600";
-                              })()}
-                            >
-                              {getGradeStatistics().B.count +
-                                getGradeStatistics().C.count}
-                              人 /{" "}
-                              {department === "jingkong"
-                                ? "39-42人"
-                                : "15-17人"}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>D+E等级（基本合格+不合格）：</span>
-                            <span
-                              className={(() => {
-                                const stats = getGradeStatistics();
-                                const deCount = stats.D.count + stats.E.count;
-                                const isValid =
-                                  department === "jingkong"
-                                    ? deCount >= 3 && deCount <= 6
-                                    : deCount >= 1 && deCount <= 4;
-                                return isValid
-                                  ? "text-green-600"
-                                  : "text-red-600";
-                              })()}
-                            >
-                              {getGradeStatistics().D.count +
-                                getGradeStatistics().E.count}
-                              人 /{" "}
-                              {department === "jingkong" ? "3-6人" : "1-4人"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 调整建议 */}
-                      {(() => {
-                        const validation = validateGradeDistribution(
-                          userEvaluations,
-                          department
-                        );
-                        if (!validation.valid) {
-                          const suggestions = getGradeDistributionSuggestions(
-                            userEvaluations,
-                            department
-                          );
-                          return (
-                            <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                              <div className="font-medium text-yellow-800 mb-2">
-                                调整建议：
-                              </div>
-                              <div className="space-y-1 text-sm text-yellow-700">
-                                {suggestions.map((suggestion, index) => (
-                                  <div key={index}>• {suggestion.message}</div>
-                                ))}
-                              </div>
+                            <div className="space-y-1 text-sm text-yellow-700">
+                              {suggestions.map((suggestion, index) => (
+                                <div key={index}>• {suggestion.message}</div>
+                              ))}
                             </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* 等级过滤器 */}
             <div className="flex items-center gap-4 flex-wrap">

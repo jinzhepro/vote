@@ -432,52 +432,6 @@ export function AdminDashboard() {
                           暂无经控贸易部门负责人投票数据
                         </div>
                       )}
-
-                      {/* 经控贸易负责人评价的人员平均分 */}
-                      <div className="mt-6">
-                        <h5 className="font-medium text-md mb-3 text-blue-600">
-                          负责人评价的人员平均分
-                        </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {apiJingkongPersonnel.map((person) => {
-                            const evaluation = getPersonnelEvaluations(person);
-                            const leaderEvaluations =
-                              evaluation?.evaluations?.filter(
-                                (e) =>
-                                  e.role === "leader" &&
-                                  e.department === "jingkong"
-                              );
-                            const averageScore =
-                              leaderEvaluations?.length > 0
-                                ? (
-                                    leaderEvaluations.reduce(
-                                      (sum, e) => sum + e.total_score,
-                                      0
-                                    ) / leaderEvaluations.length
-                                  ).toFixed(1)
-                                : 0;
-
-                            return (
-                              <div
-                                key={person.name}
-                                className={`p-2 border rounded text-sm ${
-                                  averageScore > 0
-                                    ? "bg-blue-50 border-blue-200"
-                                    : "bg-gray-50"
-                                }`}
-                              >
-                                <div className="font-medium">{person.name}</div>
-                                <div className="text-blue-700">
-                                  平均分:{" "}
-                                  {averageScore > 0
-                                    ? `${averageScore}分`
-                                    : "暂无评价"}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
 
                     {/* 员工统计 */}
@@ -554,52 +508,6 @@ export function AdminDashboard() {
                           暂无经控贸易员工投票数据
                         </div>
                       )}
-
-                      {/* 经控贸易员工评价的人员平均分 */}
-                      <div className="mt-6">
-                        <h5 className="font-medium text-md mb-3 text-green-600">
-                          员工评价的人员平均分
-                        </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {apiJingkongPersonnel.map((person) => {
-                            const evaluation = getPersonnelEvaluations(person);
-                            const employeeEvaluations =
-                              evaluation?.evaluations?.filter(
-                                (e) =>
-                                  e.role === "employee" &&
-                                  e.department === "jingkong"
-                              );
-                            const averageScore =
-                              employeeEvaluations?.length > 0
-                                ? (
-                                    employeeEvaluations.reduce(
-                                      (sum, e) => sum + e.total_score,
-                                      0
-                                    ) / employeeEvaluations.length
-                                  ).toFixed(1)
-                                : 0;
-
-                            return (
-                              <div
-                                key={person.name}
-                                className={`p-2 border rounded text-sm ${
-                                  averageScore > 0
-                                    ? "bg-green-50 border-green-200"
-                                    : "bg-gray-50"
-                                }`}
-                              >
-                                <div className="font-medium">{person.name}</div>
-                                <div className="text-green-700">
-                                  平均分:{" "}
-                                  {averageScore > 0
-                                    ? `${averageScore}分`
-                                    : "暂无评价"}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -682,52 +590,6 @@ export function AdminDashboard() {
                           暂无开投贸易部门负责人投票数据
                         </div>
                       )}
-
-                      {/* 开投贸易负责人评价的人员平均分 */}
-                      <div className="mt-6">
-                        <h5 className="font-medium text-md mb-3 text-blue-600">
-                          负责人评价的人员平均分
-                        </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {apiKaitouPersonnel.map((person) => {
-                            const evaluation = getPersonnelEvaluations(person);
-                            const leaderEvaluations =
-                              evaluation?.evaluations?.filter(
-                                (e) =>
-                                  e.role === "leader" &&
-                                  e.department === "kaitou"
-                              );
-                            const averageScore =
-                              leaderEvaluations?.length > 0
-                                ? (
-                                    leaderEvaluations.reduce(
-                                      (sum, e) => sum + e.total_score,
-                                      0
-                                    ) / leaderEvaluations.length
-                                  ).toFixed(1)
-                                : 0;
-
-                            return (
-                              <div
-                                key={person.name}
-                                className={`p-2 border rounded text-sm ${
-                                  averageScore > 0
-                                    ? "bg-blue-50 border-blue-200"
-                                    : "bg-gray-50"
-                                }`}
-                              >
-                                <div className="font-medium">{person.name}</div>
-                                <div className="text-blue-700">
-                                  平均分:{" "}
-                                  {averageScore > 0
-                                    ? `${averageScore}分`
-                                    : "暂无评价"}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
 
                     {/* 员工统计 */}
@@ -804,52 +666,6 @@ export function AdminDashboard() {
                           暂无开投贸易员工投票数据
                         </div>
                       )}
-
-                      {/* 开投贸易员工评价的人员平均分 */}
-                      <div className="mt-6">
-                        <h5 className="font-medium text-md mb-3 text-green-600">
-                          员工评价的人员平均分
-                        </h5>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {apiKaitouPersonnel.map((person) => {
-                            const evaluation = getPersonnelEvaluations(person);
-                            const employeeEvaluations =
-                              evaluation?.evaluations?.filter(
-                                (e) =>
-                                  e.role === "employee" &&
-                                  e.department === "kaitou"
-                              );
-                            const averageScore =
-                              employeeEvaluations?.length > 0
-                                ? (
-                                    employeeEvaluations.reduce(
-                                      (sum, e) => sum + e.total_score,
-                                      0
-                                    ) / employeeEvaluations.length
-                                  ).toFixed(1)
-                                : 0;
-
-                            return (
-                              <div
-                                key={person.name}
-                                className={`p-2 border rounded text-sm ${
-                                  averageScore > 0
-                                    ? "bg-green-50 border-green-200"
-                                    : "bg-gray-50"
-                                }`}
-                              >
-                                <div className="font-medium">{person.name}</div>
-                                <div className="text-green-700">
-                                  平均分:{" "}
-                                  {averageScore > 0
-                                    ? `${averageScore}分`
-                                    : "暂无评价"}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>

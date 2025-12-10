@@ -172,6 +172,11 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
+    // 检查是否为批量提交
+    if (body.batch && Array.isArray(body.evaluations)) {
+      return await handleBatchSubmission(body.evaluations);
+    }
+
     // 验证必需字段
     if (
       !body.userId ||
@@ -256,6 +261,116 @@ export async function POST(request) {
     console.error("API 错误:", err);
     return NextResponse.json(
       { error: "服务器内部错误", details: err.message },
+      { status: 500 }
+    );
+  }
+}
+
+// 处理批量提交的函数
+async function handleBatchSubmission(evaluations) {
+  try {
+    const results = [];
+    const errors = [];
+
+    // 准备批量插入和更新的数据
+    const insertData = [];
+    const updateData = [];
+
+    // 检查每个评价是否已存在
+    for (const evaluation of evaluations) {
+      // 验证必需字段
+      if (
+        !evaluation.userId ||
+        !evaluation.personnelId ||
+        !evaluation.department ||
+        !evaluation.scores ||
+        !evaluation.totalScore
+      ) {
+        errors.push({
+          personnelId: evaluation.personnelId,
+          error: "缺少必需字段",
+        });
+        continue;
+      }
+
+      // 检查是否已经评价过
+      const { data: existingEvaluation } = await supabase
+        .from("evaluations")
+        .select("*")
+        .eq("user_id", evaluation.userId)
+        .eq("personnel_id", evaluation.personnelId)
+        .single();
+
+      if (existingEvaluation) {
+        updateData.push({
+          id: existingEvaluation.id,
+          scores: evaluation.scores,
+          total_score: evaluation.totalScore,
+          comments: evaluation.comments || null,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        insertData.push({
+          user_id: evaluation.userId,
+          personnel_id: evaluation.personnelId,
+          department: evaluation.department,
+          role: evaluation.role || "employee",
+          scores: evaluation.scores,
+          total_score: evaluation.totalScore,
+          comments: evaluation.comments || null,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // 批量插入新评价
+    if (insertData.length > 0) {
+      const { data: insertedData, error: insertError } = await supabase
+        .from("evaluations")
+        .insert(insertData)
+        .select();
+
+      if (insertError) {
+        console.error("批量插入评价失败:", insertError);
+        errors.push({
+          error: `批量插入失败: ${insertError.message}`,
+        });
+      } else {
+        results.push(...insertedData);
+      }
+    }
+
+    // 批量更新现有评价
+    if (updateData.length > 0) {
+      const { data: updatedData, error: updateError } = await supabase
+        .from("evaluations")
+        .upsert(updateData)
+        .select();
+
+      if (updateError) {
+        console.error("批量更新评价失败:", updateError);
+        errors.push({
+          error: `批量更新失败: ${updateError.message}`,
+        });
+      } else {
+        results.push(...updatedData);
+      }
+    }
+
+    return NextResponse.json({
+      success: errors.length === 0,
+      message:
+        errors.length === 0
+          ? `批量提交成功，共处理 ${results.length} 个评价`
+          : `批量提交部分成功，成功 ${results.length} 个，失败 ${errors.length} 个`,
+      results,
+      errors,
+      totalProcessed: evaluations.length,
+    });
+  } catch (err) {
+    console.error("批量提交 API 错误:", err);
+    return NextResponse.json(
+      { error: "批量提交失败", details: err.message },
       { status: 500 }
     );
   }

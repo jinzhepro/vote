@@ -18,6 +18,7 @@ import {
   validateGradeDistribution,
   getGradeDistributionSuggestions,
 } from "@/data/evaluationCriteria";
+import { getPersonnelByDepartment } from "@/data/personnelData";
 import { getDeviceId } from "@/lib/deviceId";
 
 export function EvaluationVote({ department, onBack, initialPersonId }) {
@@ -43,30 +44,20 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     return deviceId;
   };
 
-  // 获取部门人员（从API）
+  // 获取部门人员（从本地数据）
   const fetchPersonnel = async () => {
     try {
-      const response = await fetch(`/api/personnel?department=${department}`);
+      // 使用本地人员数据
+      const personnelData = await getPersonnelByDepartment(department);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          // 为每个人员添加额外的属性
-          const personnelObjects = (result.data || []).map((person) => ({
-            ...person,
-            type: getDepartmentName(),
-            department: getDepartmentName(),
-          }));
+      // 为每个人员添加额外的属性
+      const personnelObjects = personnelData.map((person) => ({
+        ...person,
+        type: getDepartmentName(),
+        department: getDepartmentName(),
+      }));
 
-          setPersonnel(personnelObjects);
-        } else {
-          console.error("获取人员数据失败:", result.error);
-          setPersonnel([]);
-        }
-      } else {
-        console.error("获取人员数据失败");
-        setPersonnel([]);
-      }
+      setPersonnel(personnelObjects);
     } catch (error) {
       console.error("获取人员失败:", error);
       setPersonnel([]);
@@ -208,71 +199,61 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     try {
-      const results = [];
-      const errors = [];
-
-      // 逐个提交评价到服务器
-      for (const [personnelId, evaluation] of Object.entries(evaluations)) {
-        try {
-          const response = await fetch("/api/evaluations", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              userId: currentDeviceId,
-              personnelId: personnelId,
-              department: evaluation.department,
-              role: evaluation.role,
-              scores: evaluation.scores,
-              totalScore: evaluation.totalScore,
-              comments: evaluation.comments || null,
-            }),
-          });
-
-          const result = await response.json();
-
-          if (result.success) {
-            results.push(result.data);
-            // 标记为已提交
-            evaluation.submitted = true;
-            evaluation.submittedAt = new Date().toISOString();
-          } else {
-            errors.push({
-              personnelId,
-              error: result.error || "提交失败",
-            });
-          }
-        } catch (error) {
-          errors.push({
-            personnelId,
-            error: error.message || "网络错误",
-          });
-        }
-      }
-
-      // 创建新的 localEvaluations，只保留当前设备ID的数据
-      const newLocalEvaluations = {};
-      if (localEvaluations[currentDeviceId]) {
-        newLocalEvaluations[currentDeviceId] =
-          localEvaluations[currentDeviceId];
-      }
-
-      // 保存更新后的本地数据
-      localStorage.setItem(
-        "localEvaluations",
-        JSON.stringify(newLocalEvaluations)
+      // 准备批量提交的数据
+      const batchEvaluations = Object.entries(evaluations).map(
+        ([personnelId, evaluation]) => ({
+          userId: currentDeviceId,
+          personnelId: personnelId,
+          department: evaluation.department,
+          role: evaluation.role,
+          scores: evaluation.scores,
+          totalScore: evaluation.totalScore,
+          comments: evaluation.comments || null,
+        })
       );
 
-      return {
-        success: errors.length === 0,
-        message:
-          errors.length === 0
-            ? `成功提交 ${results.length} 个评价`
-            : `成功提交 ${results.length} 个评价，${errors.length} 个失败`,
-        results,
-        errors,
-      };
+      // 批量提交评价到服务器
+      const response = await fetch("/api/evaluations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          batch: true,
+          evaluations: batchEvaluations,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 标记所有评价为已提交
+        Object.keys(evaluations).forEach((personnelId) => {
+          evaluations[personnelId].submitted = true;
+          evaluations[personnelId].submittedAt = new Date().toISOString();
+        });
+
+        // 保存更新后的本地数据
+        localStorage.setItem(
+          "localEvaluations",
+          JSON.stringify(localEvaluations)
+        );
+
+        return {
+          success: true,
+          message:
+            result.message || `成功提交 ${result.results?.length || 0} 个评价`,
+          results: result.results || [],
+          errors: result.errors || [],
+        };
+      } else {
+        return {
+          success: false,
+          message: result.message || "批量提交失败",
+          results: result.results || [],
+          errors: result.errors || [],
+        };
+      }
     } catch (error) {
       console.error("批量提交失败:", error);
       return {
@@ -935,21 +916,19 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                           {loading ? (
                             <LoadingSpinner size="sm" />
                           ) : (
-                            "保存到本地并下一个"
+                            "保存并下一个"
                           )}
                         </Button>
                       )}
 
-                      {/* 重新保存按钮 - 仅当已评价过时显示 */}
-                      {hasEvaluation(selectedPerson) && (
-                        <Button
-                          onClick={resaveEvaluation}
-                          disabled={getButtonDisabled()}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                        >
-                          {loading ? <LoadingSpinner size="sm" /> : "保存"}
-                        </Button>
-                      )}
+                      {/* 重新保存按钮  */}
+                      <Button
+                        onClick={resaveEvaluation}
+                        disabled={getButtonDisabled()}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        {loading ? <LoadingSpinner size="sm" /> : "保存"}
+                      </Button>
 
                       {/* 提交所有评价按钮 - 仅在评价最后一个人员时显示 */}
                       {isLastPerson() && (
