@@ -371,10 +371,11 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
   // 当有初始人员ID时，获取该人员的详情
   useEffect(() => {
-    if (initialPersonId) {
+    if (initialPersonId && personnel.length > 0) {
       fetchPersonDetails(initialPersonId);
+      setSelectedPerson(initialPersonId);
     }
-  }, [initialPersonId]);
+  }, [initialPersonId, personnel]);
 
   const getDepartmentName = () => {
     const names = {
@@ -729,7 +730,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                                         已保存
                                       </span>
                                     )}
-                                  {!mergedEvaluations[selectedPerson] &&
+                                  {evaluations[key] === option.value &&
                                     isDefaultValue(key, option.value) && (
                                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                         默认
