@@ -173,17 +173,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       const result = await response.json();
 
       if (result.success) {
-        // 标记所有评价为已提交
-        Object.keys(evaluations).forEach((personnelId) => {
-          evaluations[personnelId].submitted = true;
-          evaluations[personnelId].submittedAt = new Date().toISOString();
-        });
-
-        // 保存更新后的本地数据
-        localStorage.setItem(
-          "localEvaluations",
-          JSON.stringify(localEvaluations)
-        );
+        // 提交成功后清空本地存储
+        localStorage.removeItem("localEvaluations");
 
         toast.success(
           result.message ||
