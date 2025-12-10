@@ -319,7 +319,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-semibold">
-                {getDepartmentName()} - 人员列表
+                {getDepartmentName()} - 2025年度员工绩效考核
               </h1>
               <p className="text-gray-600 mt-2">选择人员开始评价</p>
               <div className="text-sm text-gray-500 mt-1">
@@ -700,15 +700,12 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                         </CardTitle>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(
-                            person.type
+                            person.department
                           )}`}
                         >
-                          {person.type}
+                          {person.department}
                         </span>
                       </div>
-                      <CardDescription className="text-sm">
-                        {person.department}
-                      </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="space-y-2 text-xs text-gray-500 mb-4">
