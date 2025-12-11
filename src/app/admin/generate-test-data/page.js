@@ -154,22 +154,6 @@ export default function GenerateTestDataPage() {
         .concat(Array(bCount).fill("B"))
         .concat(Array(adjustedC).fill("C"))
         .concat(Array(adjustedDE).fill("D"));
-    } else if (department === "functional") {
-      // 职能部门：A≤1人，B=2-3人，C=1-2人，D+E=0-1人
-      const aCount = Math.min(Math.floor(Math.random() * 2), 1); // 0-1人
-      const bCount = Math.floor(Math.random() * 2) + 2; // 2-3人
-      const cCount = Math.floor(Math.random() * 2) + 1; // 1-2人
-      const deCount = personnelCount - aCount - bCount - cCount; // 剩余人数
-
-      // 确保D+E在0-1人范围内
-      const adjustedDE = Math.max(0, Math.min(1, deCount));
-      const adjustedC = personnelCount - aCount - bCount - adjustedDE;
-
-      distribution = Array(aCount)
-        .fill("A")
-        .concat(Array(bCount).fill("B"))
-        .concat(Array(adjustedC).fill("C"))
-        .concat(Array(adjustedDE).fill("D"));
     }
 
     // 随机打乱分布
@@ -587,7 +571,6 @@ export default function GenerateTestDataPage() {
                 <p>• 评价分数按照各部门等级分布要求生成：</p>
                 <p> - 经控贸易：A≤11人，B=23-26人，C=18-21人，D+E=3-6人</p>
                 <p> - 开投贸易：A≤3人，B=9-11人，C=6-8人，D+E=1-3人</p>
-                <p> - 职能部门：A≤1人，B=2-3人，C=1-2人，D+E=0-1人</p>
                 <p>• 数据仅保存在浏览器本地存储中，不会提交到服务器</p>
                 <p>• 可以导出JSON文件或查看控制台中的完整数据</p>
                 <p>• 数据格式严格按照 localEvaluations 的标准格式生成</p>

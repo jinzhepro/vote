@@ -256,15 +256,6 @@ export const validateGradeDistribution = (evaluations, department) => {
       DE: { min: 1, max: 3, description: "1-3人" },
     };
     departmentName = "开投贸易";
-  } else if (department === "functional") {
-    // 职能部门规则
-    validationRules = {
-      A: { max: 1, description: "≤1人" },
-      B: { min: 2, max: 3, description: "2-3人" },
-      C: { min: 1, max: 2, description: "1-2人" },
-      DE: { min: 0, max: 1, description: "0-1人" },
-    };
-    departmentName = "职能部门";
   } else {
     // 其他部门不需要等级分布验证
     return { valid: true, message: "该部门不需要等级分布验证" };
@@ -467,13 +458,6 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
       B: { min: 9, max: 11 },
       C: { min: 6, max: 8 },
       DE: { min: 1, max: 3 },
-    };
-  } else if (department === "functional") {
-    limits = {
-      A: 1,
-      B: { min: 2, max: 3 },
-      C: { min: 1, max: 2 },
-      DE: { min: 0, max: 1 },
     };
   } else {
     return [];
