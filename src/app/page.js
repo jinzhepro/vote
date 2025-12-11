@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getPersonnelByName } from "@/data/personnelData";
 import { toast } from "sonner";
+import { generateEncryptedUserId } from "@/lib/encryption";
 
 export default function Home() {
   const [name, setName] = useState("");
@@ -30,6 +31,14 @@ export default function Home() {
         toast.error("未找到该姓名对应的人员信息");
         return;
       }
+
+      // 生成基于姓名和部门的加密userid
+      const encryptedUserId = generateEncryptedUserId(
+        name.trim(),
+        person.department
+      );
+
+      localStorage.setItem("userId", encryptedUserId);
 
       // 如果是职能部门，跳转到部门选择页面
       if (person.department === "functional") {

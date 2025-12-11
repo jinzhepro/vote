@@ -173,8 +173,29 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       const result = await response.json();
 
       if (result.success) {
-        // 提交成功后清空本地存储
-        localStorage.removeItem("localEvaluations");
+        // 记录已完成的部门（仅对职能部门用户）
+        if (role === "functional") {
+          const completedDepts = JSON.parse(
+            localStorage.getItem("completedDepartments") || "[]"
+          );
+          if (!completedDepts.includes(department)) {
+            completedDepts.push(department);
+            localStorage.setItem(
+              "completedDepartments",
+              JSON.stringify(completedDepts)
+            );
+          }
+        }
+
+        // 提交成功后只清空当前部门的评价数据，保留用户信息
+        if (localEvaluations[currentDeviceId]) {
+          // 清空当前部门的评价数据，但保留用户信息
+          localEvaluations[currentDeviceId].evaluations = {};
+          localStorage.setItem(
+            "localEvaluations",
+            JSON.stringify(localEvaluations)
+          );
+        }
 
         toast.success(
           result.message ||
@@ -316,7 +337,13 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               </h1>
               <p className="text-gray-600 mt-2">选择人员开始评价</p>
               <div className="text-sm text-gray-500 mt-1">
-                用户ID: {userId} ({role === "leader" ? "部门负责人" : "员工"})
+                用户ID: {userId} (
+                {role === "functional"
+                  ? "职能部门"
+                  : role === "leader"
+                  ? "部门负责人"
+                  : "员工"}
+                )
               </div>
             </div>
           </div>
@@ -335,6 +362,51 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                       <div className="text-xs mt-1">
                         所有评价数据都保存在本地浏览器中
                       </div>
+
+                      {/* 显示已评价人员的详细信息 */}
+                      <div className="mt-3 space-y-2">
+                        <div className="font-medium text-sm">
+                          已评价人员列表：
+                        </div>
+                        <div className="max-h-32 overflow-y-auto space-y-1">
+                          {Object.entries(localEvaluations).map(
+                            ([personId, evaluation]) => {
+                              const person = personnel.find(
+                                (p) => p.id === personId
+                              );
+                              const grade = getScoreGrade(
+                                evaluation.totalScore
+                              );
+                              return (
+                                <div
+                                  key={personId}
+                                  className="flex items-center justify-between text-xs bg-white p-2 rounded border"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">
+                                      {person?.name || `人员${personId}`}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      {evaluation.totalScore}分
+                                    </span>
+                                    <span
+                                      className={`px-1 py-0.5 rounded text-xs ${grade.color}`}
+                                    >
+                                      {grade.letter}
+                                    </span>
+                                  </div>
+                                  <span className="text-gray-400 text-xs">
+                                    {new Date(
+                                      evaluation.timestamp
+                                    ).toLocaleDateString("zh-CN")}
+                                  </span>
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+
                       <div className="mt-3">
                         <Dialog
                           open={clearAllDialogOpen}

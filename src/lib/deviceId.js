@@ -5,6 +5,11 @@ export const generateDeviceId = (isLeader = false, isFunctional = false) => {
   // 尝试从现有的存储中获取设备ID
   let deviceId = localStorage.getItem("userId");
 
+  // 如果已经有userid，直接使用
+  if (deviceId) {
+    return deviceId;
+  }
+
   // 检查当前存储的ID是否与请求的角色匹配
   const needsNewId =
     deviceId &&

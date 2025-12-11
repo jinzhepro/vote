@@ -30,7 +30,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   const [userEvaluations, setUserEvaluations] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [userId, setUserId] = useState("");
   const [selectedPersonDetails, setSelectedPersonDetails] = useState(null);
@@ -227,8 +226,35 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       const result = await response.json();
 
       if (result.success) {
-        // 提交成功后清空本地存储
-        localStorage.removeItem("localEvaluations");
+        // 记录已完成的部门（仅对职能部门用户）
+        const currentRole = getCurrentRole();
+        if (currentRole === "functional") {
+          const completedDepts = JSON.parse(
+            localStorage.getItem("completedDepartments") || "[]"
+          );
+          if (!completedDepts.includes(department)) {
+            completedDepts.push(department);
+            localStorage.setItem(
+              "completedDepartments",
+              JSON.stringify(completedDepts)
+            );
+          }
+        }
+
+        // 提交成功后只清空当前部门的评价数据，保留其他部门的数据
+        const currentDeviceId = userId || initializeDeviceId();
+        const localEvaluations = JSON.parse(
+          localStorage.getItem("localEvaluations") || "{}"
+        );
+
+        if (localEvaluations[currentDeviceId]) {
+          // 清空当前部门的评价数据，但保留用户信息
+          localEvaluations[currentDeviceId].evaluations = {};
+          localStorage.setItem(
+            "localEvaluations",
+            JSON.stringify(localEvaluations)
+          );
+        }
 
         return {
           success: true,
@@ -1016,28 +1042,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
             <LoadingSpinner size="lg" />
             <h3 className="text-xl font-semibold mt-4 mb-2">正在提交</h3>
             <p className="text-gray-600">请不要操作，正在保存所有评价数据...</p>
-          </div>
-        </div>
-      )}
-
-      {/* 提交成功烟花效果 */}
-      {showSuccess && (
-        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-sm mx-4 text-center shadow-lg">
-            <div className="text-6xl mb-4">🎉</div>
-            <h3 className="text-2xl font-bold text-green-600 mb-2">
-              提交成功！
-            </h3>
-            <p className="text-gray-600">所有评价数据已成功保存</p>
-            <div className="mt-4 space-y-2">
-              <div className="text-sm text-gray-500">评价完成率: 100%</div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{ width: "100%" }}
-                ></div>
-              </div>
-            </div>
           </div>
         </div>
       )}
