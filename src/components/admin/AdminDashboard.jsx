@@ -431,24 +431,26 @@ export function AdminDashboard() {
                 <div className="space-y-8">
                   {/* 经控贸易用户统计 */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                       <h3 className="text-xl font-semibold text-blue-600">
                         经控贸易 - 用户投票详情
                       </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportToExcel("jingkong", "leader")}
-                      >
-                        导出负责人Excel
-                      </Button>
                     </div>
 
                     {/* Leader 统计 */}
                     <div className="mb-6">
-                      <h4 className="font-medium text-lg mb-3 text-blue-600">
-                        部门负责人 (Leader)
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-blue-600">
+                          部门负责人 (Leader)
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("jingkong", "leader")}
+                        >
+                          导出负责人Excel
+                        </Button>
+                      </div>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) =>
@@ -529,10 +531,11 @@ export function AdminDashboard() {
 
                     {/* 员工统计 */}
                     <div>
+                      <h4 className="font-medium text-lg mb-3 text-green-600">
+                        普通员工 (Employee)
+                      </h4>
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-lg text-green-600">
-                          普通员工 (Employee)
-                        </h4>
+                        <div></div>
                         <Button
                           variant="outline"
                           size="sm"
@@ -622,24 +625,26 @@ export function AdminDashboard() {
 
                   {/* 开投贸易用户统计 */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                       <h3 className="text-xl font-semibold text-green-600">
                         开投贸易 - 用户投票详情
                       </h3>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportToExcel("kaitou", "leader")}
-                      >
-                        导出负责人Excel
-                      </Button>
                     </div>
 
                     {/* Leader 统计 */}
                     <div className="mb-6">
-                      <h4 className="font-medium text-lg mb-3 text-blue-600">
-                        部门负责人 (Leader)
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-blue-600">
+                          部门负责人 (Leader)
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("kaitou", "leader")}
+                        >
+                          导出负责人Excel
+                        </Button>
+                      </div>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) =>
@@ -719,10 +724,11 @@ export function AdminDashboard() {
 
                     {/* 员工统计 */}
                     <div>
+                      <h4 className="font-medium text-lg mb-3 text-green-600">
+                        普通员工 (Employee)
+                      </h4>
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-lg text-green-600">
-                          普通员工 (Employee)
-                        </h4>
+                        <div></div>
                         <Button
                           variant="outline"
                           size="sm"
@@ -812,11 +818,18 @@ export function AdminDashboard() {
 
                   {/* 职能部门用户统计 */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4">
                       <h3 className="text-xl font-semibold text-purple-600">
                         职能部门 - 用户投票详情
                       </h3>
-                      <div className="space-x-2">
+                    </div>
+
+                    {/* 经控贸易评价统计 */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-blue-600">
+                          经控贸易
+                        </h4>
                         <Button
                           variant="outline"
                           size="sm"
@@ -826,21 +839,7 @@ export function AdminDashboard() {
                         >
                           导出经控贸易Excel
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => exportToExcel("kaitou", "functional")}
-                        >
-                          导出开投贸易Excel
-                        </Button>
                       </div>
-                    </div>
-
-                    {/* 经控贸易评价统计 */}
-                    <div className="mb-6">
-                      <h4 className="font-medium text-lg mb-3 text-blue-600">
-                        经控贸易
-                      </h4>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) => user.role === "functional"
@@ -927,9 +926,18 @@ export function AdminDashboard() {
 
                     {/* 开投贸易评价统计 */}
                     <div>
-                      <h4 className="font-medium text-lg text-green-600">
-                        开投贸易
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-lg text-green-600">
+                          开投贸易
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("kaitou", "functional")}
+                        >
+                          导出开投贸易Excel
+                        </Button>
+                      </div>
                       {stats &&
                       Object.entries(stats.users).filter(
                         ([_, user]) => user.role === "functional"
