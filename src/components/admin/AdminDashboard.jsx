@@ -403,6 +403,12 @@ export function AdminDashboard() {
               <Button variant="outline" onClick={loadEvaluations}>
                 刷新数据
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => router.push("/admin/generate-test-data")}
+              >
+                生成测试数据
+              </Button>
               <Button variant="destructive" onClick={clearAllData}>
                 清除所有数据
               </Button>

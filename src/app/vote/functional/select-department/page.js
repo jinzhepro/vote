@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { generateDeviceId } from "@/lib/deviceId";
 
 export default function FunctionalSelectDepartmentPage() {
   const router = useRouter();
@@ -22,14 +21,15 @@ export default function FunctionalSelectDepartmentPage() {
     setTimeout(() => setIsClient(true), 0);
   }, []);
 
-  // 页面加载时检查是否有userid，如果没有则生成
+  // 页面加载时检查是否有userid
   useEffect(() => {
     // 检查是否已经有userid
     const userId = localStorage.getItem("userId");
 
-    // 如果没有userid，说明是直接访问此页面，需要生成一个新的userid
+    // 如果没有userid，返回首页
     if (!userId) {
-      generateDeviceId(false, true); // 传递false表示不是leader，true表示是职能部门
+      router.push("/");
+      return;
     }
 
     // 检查已完成的部门

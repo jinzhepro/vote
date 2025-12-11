@@ -55,9 +55,14 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       return savedUserId;
     }
 
-    // 如果没有保存的userId，返回空字符串
-    setUserId("");
-    return "";
+    // 如果没有保存的userId，返回首页
+    if (!savedUserId) {
+      router.push("/");
+      return null;
+    }
+
+    setUserId(savedUserId);
+    return savedUserId;
   };
 
   // 从本地存储加载评价数据
@@ -366,50 +371,6 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                       <div>已保存 {localCount} 个评价到本地存储</div>
                       <div className="text-xs mt-1">
                         所有评价数据都保存在本地浏览器中
-                      </div>
-
-                      {/* 显示已评价人员的详细信息 */}
-                      <div className="mt-3 space-y-2">
-                        <div className="font-medium text-sm">
-                          已评价人员列表：
-                        </div>
-                        <div className="max-h-32 overflow-y-auto space-y-1">
-                          {Object.entries(localEvaluations).map(
-                            ([personId, evaluation]) => {
-                              const person = personnel.find(
-                                (p) => p.id === personId
-                              );
-                              const grade = getScoreGrade(
-                                evaluation.totalScore
-                              );
-                              return (
-                                <div
-                                  key={personId}
-                                  className="flex items-center justify-between text-xs bg-white p-2 rounded border"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">
-                                      {person?.name || `人员${personId}`}
-                                    </span>
-                                    <span className="text-gray-500">
-                                      {evaluation.totalScore}分
-                                    </span>
-                                    <span
-                                      className={`px-1 py-0.5 rounded text-xs ${grade.color}`}
-                                    >
-                                      {grade.letter}
-                                    </span>
-                                  </div>
-                                  <span className="text-gray-400 text-xs">
-                                    {new Date(
-                                      evaluation.timestamp
-                                    ).toLocaleDateString("zh-CN")}
-                                  </span>
-                                </div>
-                              );
-                            }
-                          )}
-                        </div>
                       </div>
 
                       <div className="mt-3">

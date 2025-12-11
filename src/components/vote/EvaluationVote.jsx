@@ -19,7 +19,6 @@ import {
   getGradeDistributionSuggestions,
 } from "@/data/evaluationCriteria";
 import { getPersonnelByDepartment } from "@/data/personnelData";
-import { getDeviceId } from "@/lib/deviceId";
 
 export function EvaluationVote({ department, onBack, initialPersonId }) {
   const [personnel, setPersonnel] = useState([]);
@@ -38,9 +37,18 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
   const initializeDeviceId = () => {
     const currentRole = getCurrentRole();
     const isLeader = currentRole === "leader";
-    const deviceId = getDeviceId(isLeader);
-    setUserId(deviceId);
-    return deviceId;
+
+    // 检查是否已经有userid
+    let userId = localStorage.getItem("userId");
+
+    // 如果没有userid，返回首页
+    if (!userId) {
+      router.push("/");
+      return null;
+    }
+
+    setUserId(userId);
+    return userId;
   };
 
   // 获取部门人员（从本地数据）
@@ -295,34 +303,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     toast.info("已清空所有评分");
   };
 
-  // 设置为默认分数
-  const setToDefaultScores = () => {
-    const defaultEvals = getDefaultEvaluations();
-    setEvaluations(defaultEvals);
-    toast.info("已设置为默认评分");
-  };
-
-  // 获取默认评分（每个评价标准的中间值）
-  const getDefaultEvaluations = () => {
-    const defaultEvals = {};
-    Object.entries(criteria).forEach(([key, criterion]) => {
-      // 获取所有选项的分数并排序，选择中间值
-      const scores = criterion.options
-        .map((option) => option.value)
-        .sort((a, b) => a - b);
-      const middleIndex = Math.floor(scores.length / 2);
-      defaultEvals[key] = scores[middleIndex];
-    });
-    return defaultEvals;
-  };
-
-  // 检查某个评分是否为默认值
-  const isDefaultValue = (criterion, score) => {
-    const defaultEvals = getDefaultEvaluations();
-    return defaultEvals[criterion] === score;
-  };
-
-  // 当选择人员时，如果该用户已经评价过此人，则加载之前的评价，否则设置默认分数
+  // 当选择人员时，如果该用户已经评价过此人，则加载之前的评价
   const handlePersonChange = (personId) => {
     setSelectedPerson(personId);
     fetchPersonDetails(personId);
@@ -334,9 +315,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     if (mergedEvaluations[personId]) {
       setEvaluations(mergedEvaluations[personId].evaluations);
     } else {
-      // 设置默认分数
-      const defaultEvals = getDefaultEvaluations();
-      setEvaluations(defaultEvals);
+      // 清空评分，让用户手动输入
+      setEvaluations({});
     }
   };
 
@@ -350,9 +330,8 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       if (mergedEvaluations[selectedPerson]) {
         setEvaluations(mergedEvaluations[selectedPerson].evaluations);
       } else {
-        // 如果没有评价记录，设置默认分数
-        const defaultEvals = getDefaultEvaluations();
-        setEvaluations(defaultEvals);
+        // 如果没有评价记录，清空评分，让用户手动输入
+        setEvaluations({});
       }
     }
   }, [selectedPerson, userEvaluations]);
@@ -756,11 +735,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                                         已保存
                                       </span>
                                     )}
-                                  {isDefaultValue(key, option.value) && (
-                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                      默认
-                                    </span>
-                                  )}
                                 </div>
                                 <div className="text-sm text-gray-600">
                                   {option.label}
@@ -984,16 +958,6 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                           )}
                         </Button>
                       )}
-
-                      {/* 设置默认评分按钮 */}
-                      <Button
-                        variant="outline"
-                        onClick={setToDefaultScores}
-                        className="w-full"
-                        disabled={!selectedPerson}
-                      >
-                        设置默认评分
-                      </Button>
 
                       {/* 重置按钮 */}
                       <Button
