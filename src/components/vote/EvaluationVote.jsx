@@ -933,37 +933,15 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                       </div>
                     </div>
 
-                    {/* 本地存储状态 */}
-                    {(() => {
-                      const localEvaluations = loadEvaluationsFromLocal();
-                      const localCount = Object.keys(localEvaluations).length;
-                      if (localCount > 0) {
-                        return (
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <div className="text-sm text-blue-800">
-                              <div className="font-medium mb-1">
-                                本地评价状态
-                              </div>
-                              <div>已保存 {localCount} 个评价到本地</div>
-                              <div className="text-xs mt-1">
-                                所有评价数据都保存在本地浏览器中
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-
                     {/* 返回人员列表按钮 */}
                     <Button
                       variant="outline"
                       onClick={() => {
                         window.location.href = `/vote/${department}/${getCurrentRole()}`;
                       }}
-                      className="w-full"
+                      className="w-full bg-gradient-to-r from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 text-white border-blue-500 shadow-lg hover:shadow-xl transition-all duration-200"
                     >
-                      返回总览
+                      返回查看总览
                     </Button>
 
                     {/* 提交按钮 */}

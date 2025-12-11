@@ -20,7 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { getDeviceId } from "@/lib/deviceId";
+import { generateEncryptedUserId } from "@/lib/encryption";
 import {
   TrashIcon,
   AlertTriangleIcon,
@@ -47,23 +47,28 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // 初始化设备ID
-  const initializeDeviceId = () => {
-    const isLeader = role === "leader";
-    const deviceId = getDeviceId(isLeader);
-    setUserId(deviceId);
-    return deviceId;
+  // 获取已保存的用户ID
+  const getUserId = () => {
+    const savedUserId = localStorage.getItem("userId");
+    if (savedUserId) {
+      setUserId(savedUserId);
+      return savedUserId;
+    }
+
+    // 如果没有保存的userId，返回空字符串
+    setUserId("");
+    return "";
   };
 
   // 从本地存储加载评价数据
   const loadEvaluationsFromLocal = () => {
-    const currentDeviceId = userId || initializeDeviceId();
+    const currentUserId = userId || getUserId();
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
 
-    if (localEvaluations[currentDeviceId]) {
-      const userData = localEvaluations[currentDeviceId];
+    if (localEvaluations[currentUserId]) {
+      const userData = localEvaluations[currentUserId];
       const evaluationsData = {};
 
       // 转换数据格式以匹配组件期望的格式
@@ -72,7 +77,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           evaluations: evaluation.scores,
           totalScore: evaluation.totalScore,
           timestamp: evaluation.timestamp,
-          userId: currentDeviceId,
+          userId: currentUserId,
           isFromServer: false, // 标记为本地数据
         };
       });
@@ -83,9 +88,9 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return {};
   };
 
-  // 获取设备评价历史（从本地存储）
-  const fetchDeviceEvaluations = async () => {
-    const currentDeviceId = userId || initializeDeviceId();
+  // 获取用户评价历史（从本地存储）
+  const fetchUserEvaluations = async () => {
+    const currentUserId = userId || getUserId();
 
     // 直接从本地存储获取评价数据
     try {
@@ -99,7 +104,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 清空所有评价数据
   const clearAllEvaluations = () => {
-    const currentDeviceId = userId || initializeDeviceId();
+    const currentUserId = userId || getUserId();
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
@@ -117,17 +122,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 提交所有评价到服务器
   const submitAllEvaluations = async () => {
-    const currentDeviceId = userId || initializeDeviceId();
+    const currentUserId = userId || getUserId();
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
 
-    if (!localEvaluations[currentDeviceId]) {
+    if (!localEvaluations[currentUserId]) {
       toast.error("没有需要提交的评价");
       return;
     }
 
-    const userData = localEvaluations[currentDeviceId];
+    const userData = localEvaluations[currentUserId];
     const evaluations = userData.evaluations;
     const evaluationIds = Object.keys(evaluations);
 
@@ -148,7 +153,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       // 准备批量提交的数据
       const batchEvaluations = Object.entries(evaluations).map(
         ([personnelId, evaluation]) => ({
-          userId: currentDeviceId,
+          userId: currentUserId,
           personnelId: personnelId,
           department: evaluation.department,
           role: evaluation.role,
@@ -188,9 +193,9 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
         }
 
         // 提交成功后只清空当前部门的评价数据，保留用户信息
-        if (localEvaluations[currentDeviceId]) {
+        if (localEvaluations[currentUserId]) {
           // 清空当前部门的评价数据，但保留用户信息
-          localEvaluations[currentDeviceId].evaluations = {};
+          localEvaluations[currentUserId].evaluations = {};
           localStorage.setItem(
             "localEvaluations",
             JSON.stringify(localEvaluations)
@@ -250,9 +255,9 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
-      initializeDeviceId();
+      getUserId();
       await fetchPersonnel();
-      await fetchDeviceEvaluations();
+      await fetchUserEvaluations();
       setLoading(false);
     };
     initializeData();
@@ -464,7 +469,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                 onClick={async () => {
                   setLoading(true);
                   await fetchPersonnel();
-                  await fetchDeviceEvaluations();
+                  await fetchUserEvaluations();
                   setLoading(false);
                 }}
               >

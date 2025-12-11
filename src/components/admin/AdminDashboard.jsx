@@ -145,6 +145,59 @@ export function AdminDashboard() {
     return personnelId;
   };
 
+  // 尝试通过userId获取用户姓名的函数
+  const getUserNameById = (userId) => {
+    // 检查是否是加密的userId格式（基于姓名生成的）
+    if (userId.includes("_")) {
+      const [prefix, hash] = userId.split("_");
+
+      // 检查是否是有效的部门前缀
+      if (["jingkong", "kaitou", "functional"].includes(prefix)) {
+        // 尝试在所有人员中查找匹配的哈希值
+        const allPersonnel = [...apiJingkongPersonnel, ...apiKaitouPersonnel];
+
+        for (const person of allPersonnel) {
+          // 模拟加密过程来匹配
+          const createHash = (str) => {
+            let hash = 0;
+            if (str.length === 0) return hash;
+            for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = (hash << 5) - hash + char;
+              hash = hash & hash;
+            }
+            return Math.abs(hash);
+          };
+
+          const department = apiJingkongPersonnel.includes(person)
+            ? "jingkong"
+            : "kaitou";
+          const combinedHash = createHash(`${person.name}_${department}`);
+          const encryptedId = `${department}_${combinedHash}`;
+
+          if (encryptedId === userId) {
+            return person.name;
+          }
+        }
+
+        // 对于职能部门，可能不在人员列表中，尝试从localStorage获取
+        if (prefix === "functional") {
+          const savedNames = JSON.parse(
+            localStorage.getItem("functionalUserNames") || "{}"
+          );
+          for (const [name, savedId] of Object.entries(savedNames)) {
+            if (savedId === userId) {
+              return name;
+            }
+          }
+        }
+      }
+    }
+
+    // 如果无法解析，返回userId
+    return userId;
+  };
+
   // 评分标准中文映射
   const criterionNames = {
     responsibility: "责任心",
@@ -240,10 +293,20 @@ export function AdminDashboard() {
     const header = ["评价人", ...personnelColumns];
     const sheetData = [header];
 
-    // 筛选出指定部门和角色的用户
-    const filteredUsers = Object.entries(stats.users).filter(
-      ([_, user]) => user.role === role && user.department === department
-    );
+    let filteredUsers;
+
+    // 根据角色筛选用户
+    if (role === "functional") {
+      // 职能部门用户：筛选所有functional角色用户
+      filteredUsers = Object.entries(stats.users).filter(
+        ([_, user]) => user.role === "functional"
+      );
+    } else {
+      // 其他角色：筛选指定部门和角色的用户
+      filteredUsers = Object.entries(stats.users).filter(
+        ([_, user]) => user.role === role && user.department === department
+      );
+    }
 
     // 为每个用户创建一行数据
     filteredUsers.forEach(([userId, userStats]) => {
@@ -294,17 +357,25 @@ export function AdminDashboard() {
 
     // 将数据添加到工作簿
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    const sheetName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
-      role === "leader" ? "负责人" : "员工"
-    }评价`;
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
-    // 生成文件名（包含当前日期、部门和角色）
-    const today = new Date();
-    const dateStr = today.toISOString().split("T")[0]; // 格式：YYYY-MM-DD
-    const fileName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
-      role === "leader" ? "负责人" : "员工"
-    }评价数据_${dateStr}.xlsx`;
+    let sheetName, fileName;
+    if (role === "functional") {
+      sheetName = `职能部门对${
+        department === "jingkong" ? "经控贸易" : "开投贸易"
+      }评价`;
+      fileName = `职能部门${
+        department === "jingkong" ? "经控贸易" : "开投贸易"
+      }评价数据_${new Date().toISOString().split("T")[0]}.xlsx`;
+    } else {
+      sheetName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
+        role === "leader" ? "负责人" : "员工"
+      }评价`;
+      fileName = `${department === "jingkong" ? "经控贸易" : "开投贸易"}${
+        role === "leader" ? "负责人" : "员工"
+      }评价数据_${new Date().toISOString().split("T")[0]}.xlsx`;
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
     // 导出文件
     XLSX.writeFile(wb, fileName);
@@ -389,7 +460,10 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  最近投票时间
+                                  投票时间
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  完成状态
                                 </th>
                               </tr>
                             </thead>
@@ -402,15 +476,16 @@ export function AdminDashboard() {
                                       user.department === "jingkong"
                                   )
                                   .map(([userId, userStats]) => (
-                                    <tr
-                                      key={userId}
-                                      className="hover:bg-blue-50 cursor-pointer"
-                                      onClick={() =>
-                                        handleUserClick(userId, userStats)
-                                      }
-                                    >
+                                    <tr key={userId}>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        {userId}
+                                        <div>
+                                          <div className="font-medium">
+                                            {getUserNameById(userId)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {userId}
+                                          </div>
+                                        </div>
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         经控贸易
@@ -421,6 +496,18 @@ export function AdminDashboard() {
                                               userStats.evaluations[0].timestamp
                                             ).toLocaleString("zh-CN")
                                           : "无"}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        {userStats.evaluations &&
+                                        userStats.evaluations.length > 0 ? (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            已完成
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            未完成
+                                          </span>
+                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -465,7 +552,10 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  最近投票时间
+                                  投票时间
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  完成状态
                                 </th>
                               </tr>
                             </thead>
@@ -478,15 +568,16 @@ export function AdminDashboard() {
                                       user.department === "jingkong"
                                   )
                                   .map(([userId, userStats]) => (
-                                    <tr
-                                      key={userId}
-                                      className="hover:bg-green-50 cursor-pointer"
-                                      onClick={() =>
-                                        handleUserClick(userId, userStats)
-                                      }
-                                    >
+                                    <tr key={userId}>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
-                                        {userId}
+                                        <div>
+                                          <div className="font-medium">
+                                            {getUserNameById(userId)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {userId}
+                                          </div>
+                                        </div>
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         经控贸易
@@ -497,6 +588,18 @@ export function AdminDashboard() {
                                               userStats.evaluations[0].timestamp
                                             ).toLocaleString("zh-CN")
                                           : "无"}
+                                      </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        {userStats.evaluations &&
+                                        userStats.evaluations.length > 0 ? (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            已完成
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            未完成
+                                          </span>
+                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -547,7 +650,10 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  最近投票时间
+                                  投票时间
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  完成状态
                                 </th>
                               </tr>
                             </thead>
@@ -560,15 +666,16 @@ export function AdminDashboard() {
                                       user.department === "kaitou"
                                   )
                                   .map(([userId, userStats]) => (
-                                    <tr
-                                      key={userId}
-                                      className="hover:bg-blue-50 cursor-pointer"
-                                      onClick={() =>
-                                        handleUserClick(userId, userStats)
-                                      }
-                                    >
+                                    <tr key={userId}>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        {userId}
+                                        <div>
+                                          <div className="font-medium">
+                                            {getUserNameById(userId)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {userId}
+                                          </div>
+                                        </div>
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         开投贸易
@@ -579,6 +686,18 @@ export function AdminDashboard() {
                                               userStats.evaluations[0].timestamp
                                             ).toLocaleString("zh-CN")
                                           : "无"}
+                                      </td>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm">
+                                        {userStats.evaluations &&
+                                        userStats.evaluations.length > 0 ? (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            已完成
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            未完成
+                                          </span>
+                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -623,7 +742,10 @@ export function AdminDashboard() {
                                   部门
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  最近投票时间
+                                  投票时间
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  完成状态
                                 </th>
                               </tr>
                             </thead>
@@ -636,15 +758,16 @@ export function AdminDashboard() {
                                       user.department === "kaitou"
                                   )
                                   .map(([userId, userStats]) => (
-                                    <tr
-                                      key={userId}
-                                      className="hover:bg-green-50 cursor-pointer"
-                                      onClick={() =>
-                                        handleUserClick(userId, userStats)
-                                      }
-                                    >
+                                    <tr key={userId}>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
-                                        {userId}
+                                        <div>
+                                          <div className="font-medium">
+                                            {getUserNameById(userId)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {userId}
+                                          </div>
+                                        </div>
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         开投贸易
@@ -656,6 +779,18 @@ export function AdminDashboard() {
                                             ).toLocaleString("zh-CN")
                                           : "无"}
                                       </td>
+                                      <td className="border border-green-200 px-4 py-2 text-sm">
+                                        {userStats.evaluations &&
+                                        userStats.evaluations.length > 0 ? (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            已完成
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            未完成
+                                          </span>
+                                        )}
+                                      </td>
                                     </tr>
                                   ))}
                             </tbody>
@@ -664,6 +799,211 @@ export function AdminDashboard() {
                       ) : (
                         <div className="text-center text-gray-500 py-4">
                           暂无开投贸易员工投票数据
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 职能部门用户统计 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-purple-600">
+                        职能部门 - 用户投票详情
+                      </h3>
+                      <div className="space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            exportToExcel("jingkong", "functional")
+                          }
+                        >
+                          导出经控贸易Excel
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => exportToExcel("kaitou", "functional")}
+                        >
+                          导出开投贸易Excel
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 经控贸易评价统计 */}
+                    <div className="mb-6">
+                      <h4 className="font-medium text-lg mb-3 text-blue-600">
+                        经控贸易
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) => user.role === "functional"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  部门
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  投票时间
+                                </th>
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
+                                  完成状态
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) => user.role === "functional"
+                                  )
+                                  .map(([userId, userStats]) => {
+                                    const jingkongEvals =
+                                      userStats.evaluations?.filter(
+                                        (e) => e.department === "jingkong"
+                                      ) || [];
+
+                                    return (
+                                      <tr key={userId}>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm">
+                                          <div>
+                                            <div className="font-medium">
+                                              {getUserNameById(userId)}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {userId}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm">
+                                          经控贸易
+                                        </td>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
+                                          {jingkongEvals.length > 0
+                                            ? new Date(
+                                                Math.max(
+                                                  ...jingkongEvals.map(
+                                                    (e) => new Date(e.timestamp)
+                                                  )
+                                                )
+                                              ).toLocaleString("zh-CN")
+                                            : "无"}
+                                        </td>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm">
+                                          {jingkongEvals.length > 0 ? (
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              已完成
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                              未完成
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无职能部门对经控贸易的投票数据
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 开投贸易评价统计 */}
+                    <div>
+                      <h4 className="font-medium text-lg text-green-600">
+                        开投贸易
+                      </h4>
+                      {stats &&
+                      Object.entries(stats.users).filter(
+                        ([_, user]) => user.role === "functional"
+                      ).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  用户ID
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  部门
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  投票时间
+                                </th>
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
+                                  完成状态
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stats &&
+                                Object.entries(stats.users)
+                                  .filter(
+                                    ([_, user]) => user.role === "functional"
+                                  )
+                                  .map(([userId, userStats]) => {
+                                    const kaitouEvals =
+                                      userStats.evaluations?.filter(
+                                        (e) => e.department === "kaitou"
+                                      ) || [];
+
+                                    return (
+                                      <tr key={userId}>
+                                        <td className="border border-green-200 px-4 py-2 text-sm">
+                                          <div>
+                                            <div className="font-medium">
+                                              {getUserNameById(userId)}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {userId}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="border border-green-200 px-4 py-2 text-sm">
+                                          开投贸易
+                                        </td>
+                                        <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
+                                          {kaitouEvals.length > 0
+                                            ? new Date(
+                                                Math.max(
+                                                  ...kaitouEvals.map(
+                                                    (e) => new Date(e.timestamp)
+                                                  )
+                                                )
+                                              ).toLocaleString("zh-CN")
+                                            : "无"}
+                                        </td>
+                                        <td className="border border-green-200 px-4 py-2 text-sm">
+                                          {kaitouEvals.length > 0 ? (
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              已完成
+                                            </span>
+                                          ) : (
+                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                              未完成
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 py-4">
+                          暂无职能部门对开投贸易的投票数据
                         </div>
                       )}
                     </div>
@@ -686,11 +1026,17 @@ export function AdminDashboard() {
               角色:{" "}
               {selectedUserEvaluations?.role === "leader"
                 ? "部门负责人"
+                : selectedUserEvaluations?.role === "functional"
+                ? "职能部门"
                 : "普通员工"}{" "}
               | 部门:{" "}
               {selectedUserEvaluations?.department === "jingkong"
                 ? "经控贸易"
-                : "开投贸易"}
+                : selectedUserEvaluations?.department === "kaitou"
+                ? "开投贸易"
+                : selectedUserEvaluations?.department === "functional"
+                ? "职能部门"
+                : "未知"}
             </DialogDescription>
           </DialogHeader>
 
