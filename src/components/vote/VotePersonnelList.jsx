@@ -200,6 +200,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     const names = {
       jingkong: "经控贸易",
       kaitou: "开投贸易",
+      functional: "职能部门",
     };
     return names[department] || department;
   };
@@ -285,6 +286,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     const colors = {
       经控贸易: "bg-blue-100 text-blue-800",
       开投贸易: "bg-green-100 text-green-800",
+      职能部门: "bg-purple-100 text-purple-800",
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
@@ -398,8 +400,10 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               </Button>
             </div>
 
-            {/* 等级分布状态 - 仅对经控贸易部门显示 */}
-            {(department === "jingkong" || department === "kaitou") && (
+            {/* 等级分布状态 - 对经控贸易、开投贸易和职能部门显示 */}
+            {(department === "jingkong" ||
+              department === "kaitou" ||
+              department === "functional") && (
               <Card
                 className={(() => {
                   const validation = validateGradeDistribution(
@@ -463,14 +467,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                       <div>
                         {department === "jingkong"
                           ? "经控贸易部门等级分布要求：A优秀≤11人，B良好=23-26人，C合格=18-21人，D基本合格+E不合格=3-6人"
-                          : "开投贸易部门等级分布要求：A优秀≤3人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人"}
+                          : department === "kaitou"
+                          ? "开投贸易部门等级分布要求：A优秀≤3人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人"
+                          : "职能部门等级分布要求：A优秀≤1人，B良好=2-3人，C合格=1-2人，D基本合格+E不合格=0-1人"}
                       </div>
                       {department === "jingkong" && (
                         <div className="text-blue-600 font-medium">
                           绩效考核最终成绩＝部门负责人评估成绩×70%＋其他员工评估成绩×30%
                         </div>
                       )}
-                      {department === "kaitou" && (
+                      {(department === "kaitou" ||
+                        department === "functional") && (
                         <div className="text-green-600 font-medium">
                           绩效考核最终成绩＝部门负责人评估成绩（业务板块负责人、职能部门负责人）×70%＋其他员工评估成绩×30%
                         </div>
@@ -510,14 +517,21 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
-                              const limit = department === "jingkong" ? 11 : 3;
+                              let limit;
+                              if (department === "jingkong") limit = 11;
+                              else if (department === "kaitou") limit = 3;
+                              else limit = 1; // functional
                               return stats.A.count <= limit
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().A.count}人 /{" "}
-                            {department === "jingkong" ? "≤11人" : "≤3人"}
+                            {department === "jingkong"
+                              ? "≤11人"
+                              : department === "kaitou"
+                              ? "≤3人"
+                              : "≤1人"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -526,17 +540,23 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                             className={(() => {
                               const stats = getGradeStatistics();
                               const bCount = stats.B.count;
-                              const isValid =
-                                department === "jingkong"
-                                  ? bCount >= 23 && bCount <= 26
-                                  : bCount >= 9 && bCount <= 11;
+                              let isValid;
+                              if (department === "jingkong")
+                                isValid = bCount >= 23 && bCount <= 26;
+                              else if (department === "kaitou")
+                                isValid = bCount >= 9 && bCount <= 11;
+                              else isValid = bCount >= 2 && bCount <= 3; // functional
                               return isValid
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().B.count}人 /{" "}
-                            {department === "jingkong" ? "23-26人" : "9-11人"}
+                            {department === "jingkong"
+                              ? "23-26人"
+                              : department === "kaitou"
+                              ? "9-11人"
+                              : "2-3人"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -545,17 +565,23 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                             className={(() => {
                               const stats = getGradeStatistics();
                               const cCount = stats.C.count;
-                              const isValid =
-                                department === "jingkong"
-                                  ? cCount >= 18 && cCount <= 21
-                                  : cCount >= 6 && cCount <= 8;
+                              let isValid;
+                              if (department === "jingkong")
+                                isValid = cCount >= 18 && cCount <= 21;
+                              else if (department === "kaitou")
+                                isValid = cCount >= 6 && cCount <= 8;
+                              else isValid = cCount >= 1 && cCount <= 2; // functional
                               return isValid
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().C.count}人 /{" "}
-                            {department === "jingkong" ? "18-21人" : "6-8人"}
+                            {department === "jingkong"
+                              ? "18-21人"
+                              : department === "kaitou"
+                              ? "6-8人"
+                              : "1-2人"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -564,10 +590,12 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                             className={(() => {
                               const stats = getGradeStatistics();
                               const deCount = stats.D.count + stats.E.count;
-                              const isValid =
-                                department === "jingkong"
-                                  ? deCount >= 3 && deCount <= 6
-                                  : deCount >= 1 && deCount <= 3;
+                              let isValid;
+                              if (department === "jingkong")
+                                isValid = deCount >= 3 && deCount <= 6;
+                              else if (department === "kaitou")
+                                isValid = deCount >= 1 && deCount <= 3;
+                              else isValid = deCount >= 0 && deCount <= 1; // functional
                               return isValid
                                 ? "text-green-600"
                                 : "text-red-600";
@@ -575,7 +603,12 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           >
                             {getGradeStatistics().D.count +
                               getGradeStatistics().E.count}
-                            人 / {department === "jingkong" ? "3-6人" : "1-3人"}
+                            人 /{" "}
+                            {department === "jingkong"
+                              ? "3-6人"
+                              : department === "kaitou"
+                              ? "1-3人"
+                              : "0-1人"}
                           </span>
                         </div>
                       </div>

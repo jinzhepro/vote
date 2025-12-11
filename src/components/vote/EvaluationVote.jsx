@@ -269,6 +269,13 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     toast.info("已清空所有评分");
   };
 
+  // 设置为默认分数
+  const setToDefaultScores = () => {
+    const defaultEvals = getDefaultEvaluations();
+    setEvaluations(defaultEvals);
+    toast.info("已设置为默认评分");
+  };
+
   // 获取默认评分（每个评价标准的中间值）
   const getDefaultEvaluations = () => {
     const defaultEvals = {};
@@ -301,8 +308,9 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     if (mergedEvaluations[personId]) {
       setEvaluations(mergedEvaluations[personId].evaluations);
     } else {
-      // 不设置默认分数，保持为空
-      setEvaluations({});
+      // 设置默认分数
+      const defaultEvals = getDefaultEvaluations();
+      setEvaluations(defaultEvals);
     }
   };
 
@@ -316,8 +324,9 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
       if (mergedEvaluations[selectedPerson]) {
         setEvaluations(mergedEvaluations[selectedPerson].evaluations);
       } else {
-        // 如果没有评价记录，不设置默认分数，保持为空
-        setEvaluations({});
+        // 如果没有评价记录，设置默认分数
+        const defaultEvals = getDefaultEvaluations();
+        setEvaluations(defaultEvals);
       }
     }
   }, [selectedPerson, userEvaluations]);
@@ -721,7 +730,11 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                                         已保存
                                       </span>
                                     )}
-                                  {/* 移除默认标签显示 */}
+                                  {isDefaultValue(key, option.value) && (
+                                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                      默认
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-sm text-gray-600">
                                   {option.label}
@@ -967,6 +980,16 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
                           )}
                         </Button>
                       )}
+
+                      {/* 设置默认评分按钮 */}
+                      <Button
+                        variant="outline"
+                        onClick={setToDefaultScores}
+                        className="w-full"
+                        disabled={!selectedPerson}
+                      >
+                        设置默认评分
+                      </Button>
 
                       {/* 重置按钮 */}
                       <Button

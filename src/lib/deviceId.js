@@ -1,7 +1,7 @@
 // 设备ID管理工具
 
 // 生成设备ID的函数
-export const generateDeviceId = (isLeader = false) => {
+export const generateDeviceId = (isLeader = false, isFunctional = false) => {
   // 尝试从现有的存储中获取设备ID
   let deviceId = localStorage.getItem("userId");
 
@@ -9,7 +9,9 @@ export const generateDeviceId = (isLeader = false) => {
   const needsNewId =
     deviceId &&
     ((isLeader && !deviceId.startsWith("leader_")) ||
-      (!isLeader && deviceId.startsWith("leader_")));
+      (!isLeader && deviceId.startsWith("leader_")) ||
+      (isFunctional && !deviceId.startsWith("functional_")) ||
+      (!isFunctional && deviceId.startsWith("functional_")));
 
   if (!deviceId || needsNewId) {
     // 如果没有设备ID或角色不匹配，生成一个新的
@@ -24,9 +26,13 @@ export const generateDeviceId = (isLeader = false) => {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
 
-    deviceId = isLeader
-      ? `leader_${timestamp}_${random}`
-      : `device_${timestamp}_${random}`;
+    if (isFunctional) {
+      deviceId = `functional_${timestamp}_${random}`;
+    } else {
+      deviceId = isLeader
+        ? `leader_${timestamp}_${random}`
+        : `device_${timestamp}_${random}`;
+    }
 
     // 存储设备ID
     localStorage.setItem("userId", deviceId);
@@ -36,12 +42,12 @@ export const generateDeviceId = (isLeader = false) => {
 };
 
 // 获取设备ID的函数
-export const getDeviceId = (isLeader = false) => {
-  return generateDeviceId(isLeader);
+export const getDeviceId = (isLeader = false, isFunctional = false) => {
+  return generateDeviceId(isLeader, isFunctional);
 };
 
 // 重置设备ID的函数（用于测试或特殊情况）
-export const resetDeviceId = (isLeader = false) => {
+export const resetDeviceId = (isLeader = false, isFunctional = false) => {
   localStorage.removeItem("userId");
-  return generateDeviceId(isLeader);
+  return generateDeviceId(isLeader, isFunctional);
 };
