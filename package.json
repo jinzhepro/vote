@@ -14,7 +14,8 @@
     "import:personnel": "node scripts/import-personnel-to-supabase.js",
     "upload:personnel": "node scripts/upload-personnel-to-db.js",
     "fix:rls": "node scripts/fix-rls-policies.js",
-    "check:deploy": "node scripts/check-deployment.js"
+    "check:deploy": "node scripts/check-deployment.js",
+    "setup:user-tables": "node scripts/create-user-based-tables.sql"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

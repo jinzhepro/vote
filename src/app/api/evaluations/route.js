@@ -108,10 +108,13 @@ async function getStatistics(department) {
 
       // 按用户统计
       if (!stats.users[userId]) {
+        // 对于 functional 用户，部门应该设置为 "functional"
+        // 对于其他用户，使用评价记录中的部门
+        const userDepartment = role === "functional" ? "functional" : dept;
         stats.users[userId] = {
           count: 0,
           role: role,
-          department: dept,
+          department: userDepartment,
           evaluations: [],
         };
       }

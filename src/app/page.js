@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,18 @@ export default function Home() {
   const [name, setName] = useState("");
   const [idCard, setIdCard] = useState("");
   const router = useRouter();
+
+  // 进入首页时清空 completedDepartments
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        localStorage.removeItem("completedDepartments");
+        console.log("已清空 completedDepartments");
+      } catch (error) {
+        console.error("清空 completedDepartments 失败:", error);
+      }
+    }
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();

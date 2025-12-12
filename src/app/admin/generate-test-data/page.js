@@ -17,7 +17,11 @@ import {
   jingkongPersonnel,
   kaitouPersonnel,
 } from "@/data/personnelData";
-import { defaultCriteria, getScoreGrade } from "@/data/evaluationCriteria";
+import {
+  defaultCriteria,
+  getScoreGrade,
+  validateGradeDistribution,
+} from "@/data/evaluationCriteria";
 import { generateEncryptedUserId } from "@/lib/encryption";
 
 export default function GenerateTestDataPage() {
@@ -118,42 +122,48 @@ export default function GenerateTestDataPage() {
     return { scores, totalScore };
   };
 
-  // 根据部门要求生成等级分布
+  // 根据部门要求生成等级分布，严格按照 validateGradeDistribution 规则
   const generateGradeDistribution = (department, personnelCount) => {
     let distribution = [];
 
     if (department === "jingkong") {
-      // 经控贸易：A≤11人，B=23-26人，C=18-21人，D+E=3-6人
-      const aCount = Math.min(Math.floor(Math.random() * 8) + 1, 11); // 1-11人
-      const bCount = Math.floor(Math.random() * 4) + 23; // 23-26人
-      const cCount = Math.floor(Math.random() * 4) + 18; // 18-21人
-      const deCount = personnelCount - aCount - bCount - cCount; // 剩余人数
+      // 经控贸易：严格按照 validateGradeDistribution 的规则
+      // A≤11人，B=23-26人，C=18-21人，D+E=3-6人
+      // 总人数应该是55人，确保分布合理
+      let aCount, bCount, cCount, deCount;
 
-      // 确保D+E在3-6人范围内
-      const adjustedDE = Math.max(3, Math.min(6, deCount));
-      const adjustedC = personnelCount - aCount - bCount - adjustedDE;
+      // 生成符合规则的分布
+      do {
+        aCount = Math.floor(Math.random() * 11) + 1; // 1-11人
+        bCount = Math.floor(Math.random() * 4) + 23; // 23-26人
+        cCount = Math.floor(Math.random() * 4) + 18; // 18-21人
+        deCount = personnelCount - aCount - bCount - cCount; // 剩余人数
+      } while (deCount < 3 || deCount > 6); // 确保D+E在3-6人范围内
 
       distribution = Array(aCount)
         .fill("A")
         .concat(Array(bCount).fill("B"))
-        .concat(Array(adjustedC).fill("C"))
-        .concat(Array(adjustedDE).fill("D"));
+        .concat(Array(cCount).fill("C"))
+        .concat(Array(deCount).fill("D"));
     } else if (department === "kaitou") {
-      // 开投贸易：A≤3人，B=9-11人，C=6-8人，D+E=1-3人
-      const aCount = Math.min(Math.floor(Math.random() * 3) + 1, 3); // 1-3人
-      const bCount = Math.floor(Math.random() * 3) + 9; // 9-11人
-      const cCount = Math.floor(Math.random() * 3) + 6; // 6-8人
-      const deCount = personnelCount - aCount - bCount - cCount; // 剩余人数
+      // 开投贸易：严格按照 validateGradeDistribution 的规则
+      // A≤4人，B=9-11人，C=6-8人，D+E=1-3人
+      // 总人数应该是23人，确保分布合理
+      let aCount, bCount, cCount, deCount;
 
-      // 确保D+E在1-3人范围内
-      const adjustedDE = Math.max(1, Math.min(3, deCount));
-      const adjustedC = personnelCount - aCount - bCount - adjustedDE;
+      // 生成符合规则的分布
+      do {
+        aCount = Math.floor(Math.random() * 4) + 1; // 1-4人
+        bCount = Math.floor(Math.random() * 3) + 9; // 9-11人
+        cCount = Math.floor(Math.random() * 3) + 6; // 6-8人
+        deCount = personnelCount - aCount - bCount - cCount; // 剩余人数
+      } while (deCount < 1 || deCount > 3); // 确保D+E在1-3人范围内
 
       distribution = Array(aCount)
         .fill("A")
         .concat(Array(bCount).fill("B"))
-        .concat(Array(adjustedC).fill("C"))
-        .concat(Array(adjustedDE).fill("D"));
+        .concat(Array(cCount).fill("C"))
+        .concat(Array(deCount).fill("D"));
     }
 
     // 随机打乱分布
@@ -186,6 +196,7 @@ export default function GenerateTestDataPage() {
       // 使用系统相同的加密方式生成userId
       const userId = generateEncryptedUserId(userName, userInfo.department);
       const userRole = userInfo.role;
+      const userCard = userInfo.idCard; // 获取身份证号
 
       // 根据用户角色确定要评价的部门
       let targetDepartments;
@@ -240,6 +251,35 @@ export default function GenerateTestDataPage() {
         };
       });
 
+      // 验证生成的数据是否符合等级分布要求
+      for (const dept of targetDepartments) {
+        const userData = newLocalEvaluations[userId];
+        if (userData && userData.evaluations) {
+          // 转换为 validateGradeDistribution 需要的格式
+          const evaluationsForValidation = {};
+          Object.entries(userData.evaluations).forEach(
+            ([personId, evaluation]) => {
+              evaluationsForValidation[personId] = {
+                totalScore: evaluation.totalScore,
+                evaluations: evaluation.scores,
+              };
+            }
+          );
+
+          const validation = validateGradeDistribution(
+            evaluationsForValidation,
+            dept
+          );
+          if (!validation.valid) {
+            setMessage(
+              `生成的测试数据不符合${dept}部门等级分布要求：${validation.message}`
+            );
+            setMessageType("error");
+            return;
+          }
+        }
+      }
+
       // 保存到本地存储（使用 localEvaluations 格式）
       // 注意：按照 EvaluationVote.jsx 的逻辑，每次只保留当前用户的数据
       localStorage.setItem(
@@ -259,6 +299,7 @@ export default function GenerateTestDataPage() {
         userName: userName,
         userRole: userRole,
         userId: userId,
+        userCard: userCard, // 添加身份证号
         generatedAt: new Date().toISOString(),
         localEvaluations: newLocalEvaluations,
         summary: {
@@ -364,7 +405,7 @@ export default function GenerateTestDataPage() {
             <CardHeader>
               <CardTitle>测试数据生成</CardTitle>
               <CardDescription>
-                输入姓名后，系统将自动生成该用户对应的投票测试数据，数据仅保存在浏览器本地存储中
+                输入姓名后，系统将自动查找该用户的角色和部门信息
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -461,6 +502,10 @@ export default function GenerateTestDataPage() {
                     <div>
                       <span className="font-medium">用户ID:</span>{" "}
                       {generatedData.userId}
+                    </div>
+                    <div>
+                      <span className="font-medium">身份证号:</span>{" "}
+                      {generatedData.userCard || "未找到"}
                     </div>
                     <div>
                       <span className="font-medium">总评价数:</span>{" "}
@@ -568,9 +613,11 @@ export default function GenerateTestDataPage() {
                 <p>• 根据用户角色自动生成对应的评价数据</p>
                 <p>• 职能部门用户需要选择要评价的部门</p>
                 <p>• 经控贸易和开投贸易用户会自动评价自己部门</p>
-                <p>• 评价分数按照各部门等级分布要求生成：</p>
+                <p>• 评价分数严格按照各部门等级分布要求生成：</p>
                 <p> - 经控贸易：A≤11人，B=23-26人，C=18-21人，D+E=3-6人</p>
-                <p> - 开投贸易：A≤3人，B=9-11人，C=6-8人，D+E=1-3人</p>
+                <p> - 开投贸易：A≤4人，B=9-11人，C=6-8人，D+E=1-3人</p>
+                <p>• 生成的数据会自动验证是否符合等级分布要求</p>
+                <p>• 如果不符合要求，系统会提示错误并重新生成</p>
                 <p>• 数据仅保存在浏览器本地存储中，不会提交到服务器</p>
                 <p>• 可以导出JSON文件或查看控制台中的完整数据</p>
                 <p>• 数据格式严格按照 localEvaluations 的标准格式生成</p>

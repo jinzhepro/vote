@@ -208,28 +208,41 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     try {
-      // 准备批量提交的数据
-      const batchEvaluations = Object.entries(evaluations).map(
-        ([personnelId, evaluation]) => ({
-          userId: currentDeviceId,
-          personnelId: personnelId,
-          department: evaluation.department,
-          role: evaluation.role,
+      // 获取用户信息
+      const currentRole = getCurrentRole();
+      const userName = getUserNameFromStorage(currentDeviceId);
+
+      // 准备提交到新API的数据格式
+      const evaluationsData = {};
+      Object.entries(evaluations).forEach(([personnelId, evaluation]) => {
+        evaluationsData[personnelId] = {
+          personnel_id: personnelId,
           scores: evaluation.scores,
           totalScore: evaluation.totalScore,
-          comments: evaluation.comments || null,
-        })
+          timestamp: evaluation.timestamp,
+        };
+      });
+
+      // 获取已完成的部门
+      const completedDepartments = JSON.parse(
+        localStorage.getItem("completedDepartments") || "[]"
       );
 
-      // 批量提交评价到服务器
-      const response = await fetch("/api/evaluations", {
+      // 提交到新的用户评价API
+      const response = await fetch("/api/user-evaluations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          batch: true,
-          evaluations: batchEvaluations,
+          userId: currentDeviceId,
+          userName: userName,
+          userRole: currentRole,
+          userDepartment: department,
+          evaluations: evaluationsData,
+          completedDepartments: completedDepartments,
+          totalEvaluations: evaluationIds.length,
+          isSubmitted: true,
         }),
       });
 
@@ -237,28 +250,18 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
       if (result.success) {
         // 记录已完成的部门（仅对职能部门用户）
-        const currentRole = getCurrentRole();
         if (currentRole === "functional") {
-          const completedDepts = JSON.parse(
-            localStorage.getItem("completedDepartments") || "[]"
-          );
-          if (!completedDepts.includes(department)) {
-            completedDepts.push(department);
+          if (!completedDepartments.includes(department)) {
+            completedDepartments.push(department);
             localStorage.setItem(
               "completedDepartments",
-              JSON.stringify(completedDepts)
+              JSON.stringify(completedDepartments)
             );
           }
         }
 
-        // 提交成功后只清空当前部门的评价数据，保留其他部门的数据
-        const currentDeviceId = userId || initializeDeviceId();
-        const localEvaluations = JSON.parse(
-          localStorage.getItem("localEvaluations") || "{}"
-        );
-
+        // 提交成功后清空本地评价数据
         if (localEvaluations[currentDeviceId]) {
-          // 清空当前部门的评价数据，但保留用户信息
           localEvaluations[currentDeviceId].evaluations = {};
           localStorage.setItem(
             "localEvaluations",
@@ -268,27 +271,40 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
         return {
           success: true,
-          message:
-            result.message || `成功提交 ${result.results?.length || 0} 个评价`,
-          results: result.results || [],
-          errors: result.errors || [],
+          message: result.message || "评价提交成功",
+          data: result.data,
         };
       } else {
         return {
           success: false,
-          message: result.message || "批量提交失败",
-          results: result.results || [],
-          errors: result.errors || [],
+          message: result.error || "提交失败",
         };
       }
     } catch (error) {
-      console.error("批量提交失败:", error);
+      console.error("提交失败:", error);
       return {
         success: false,
-        message: "批量提交失败",
-        errors: [{ error: error.message }],
+        message: "提交失败",
+        error: error.message,
       };
     }
+  };
+
+  // 从存储中获取用户姓名的辅助函数
+  const getUserNameFromStorage = (userId) => {
+    // 尝试从localStorage获取保存的姓名
+    const savedNames = JSON.parse(
+      localStorage.getItem("functionalUserNames") || "{}"
+    );
+
+    for (const [name, savedId] of Object.entries(savedNames)) {
+      if (savedId === userId) {
+        return name;
+      }
+    }
+
+    // 如果找不到，返回userId作为后备
+    return userId;
   };
 
   // 处理评分选择

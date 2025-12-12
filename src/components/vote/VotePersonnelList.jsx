@@ -173,29 +173,32 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
     setSubmitting(true);
     try {
-      // 准备批量提交的数据
-      const batchEvaluations = Object.entries(evaluations).map(
-        ([personnelId, evaluation]) => ({
-          userId: currentUserId,
-          personnelId: personnelId,
-          department: evaluation.department,
-          role: evaluation.role,
-          scores: evaluation.scores,
-          totalScore: evaluation.totalScore,
-          comments: evaluation.comments || null,
-        })
+      // 获取用户信息
+      const userName = userData.userName || currentUserId;
+      const completedDepartments = JSON.parse(
+        localStorage.getItem("completedDepartments") || "[]"
       );
 
-      // 批量提交评价到服务器
-      const response = await fetch("/api/evaluations", {
+      // 准备基于用户存储的数据
+      const userEvaluationData = {
+        userId: currentUserId,
+        userName: userName,
+        userRole:
+          role === "functional" ? "functional" : userData.role || "employee",
+        userDepartment: department,
+        evaluations: evaluations,
+        completedDepartments: completedDepartments,
+        totalEvaluations: evaluationIds.length,
+        isSubmitted: true,
+      };
+
+      // 提交用户评价数据到服务器
+      const response = await fetch("/api/user-evaluations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          batch: true,
-          evaluations: batchEvaluations,
-        }),
+        body: JSON.stringify(userEvaluationData),
       });
 
       const result = await response.json();
@@ -203,21 +206,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       if (result.success) {
         // 记录已完成的部门（仅对职能部门用户）
         if (role === "functional") {
-          const completedDepts = JSON.parse(
-            localStorage.getItem("completedDepartments") || "[]"
-          );
-          if (!completedDepts.includes(department)) {
-            completedDepts.push(department);
+          if (!completedDepartments.includes(department)) {
+            completedDepartments.push(department);
             localStorage.setItem(
               "completedDepartments",
-              JSON.stringify(completedDepts)
+              JSON.stringify(completedDepartments)
             );
           }
         }
 
-        // 提交成功后只清空当前部门的评价数据，保留用户信息
+        // 提交成功后清空本地评价数据
         if (localEvaluations[currentUserId]) {
-          // 清空当前部门的评价数据，但保留用户信息
           localEvaluations[currentUserId].evaluations = {};
           localStorage.setItem(
             "localEvaluations",
@@ -225,17 +224,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           );
         }
 
-        toast.success(
-          result.message ||
-            `所有评价提交成功！共提交 ${result.results?.length || 0} 个评价`
-        );
+        toast.success(result.message || "所有评价提交成功！");
         // 跳转到成功页面
         router.push("/vote/success");
       } else {
-        toast.error(result.message || "批量提交失败");
-        if (result.errors && result.errors.length > 0) {
-          console.error("提交错误:", result.errors);
-        }
+        toast.error(result.message || "提交失败");
       }
     } catch (error) {
       console.error("批量提交失败:", error);

@@ -533,9 +533,34 @@ export const kaitouPersonnel = [
 ];
 
 export const functionalPersonnel = [
-  { id: "FN001", name: "郑效明", role: "leader", idCard: "37078519860919491X" },
-  { id: "FN002", name: "敬志伟", role: "leader", idCard: "37078319870718419X" },
-  { id: "FN003", name: "陈立群", role: "leader", idCard: "370822197806012017" },
-  { id: "FN004", name: "纪明霞", role: "leader", idCard: "210503199305052116" },
-  { id: "FN005", name: "贾松涛", role: "leader", idCard: "210211197704285819" },
+  {
+    id: "FN001",
+    name: "郑效明",
+    role: "functional",
+    idCard: "37078519860919491X",
+  },
+  {
+    id: "FN002",
+    name: "敬志伟",
+    role: "functional",
+    idCard: "37078319870718419X",
+  },
+  {
+    id: "FN003",
+    name: "陈立群",
+    role: "functional",
+    idCard: "370822197806012017",
+  },
+  {
+    id: "FN004",
+    name: "纪明霞",
+    role: "functional",
+    idCard: "370211197810140028",
+  },
+  {
+    id: "FN005",
+    name: "贾松涛",
+    role: "functional",
+    idCard: "210211197704285819",
+  },
 ];

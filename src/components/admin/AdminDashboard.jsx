@@ -19,7 +19,11 @@ import {
 } from "@/components/ui/dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
 import * as XLSX from "xlsx";
-import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
+import {
+  jingkongPersonnel,
+  kaitouPersonnel,
+  functionalPersonnel,
+} from "@/data/personnelData";
 
 export function AdminDashboard() {
   const router = useRouter();
@@ -32,34 +36,26 @@ export function AdminDashboard() {
 
   const loadPersonnelData = async () => {
     try {
-      const jingkongResponse = await fetch(
-        "/api/personnel?department=jingkong"
+      // 使用本地人员数据，不再从数据库获取
+      const { jingkongPersonnel, kaitouPersonnel } = await import(
+        "@/data/personnelData"
       );
-      const kaitouResponse = await fetch("/api/personnel?department=kaitou");
 
-      if (jingkongResponse.ok) {
-        const jingkongResult = await jingkongResponse.json();
-        if (jingkongResult.success) {
-          setApiJingkongPersonnel(jingkongResult.data || []);
-        } else {
-          console.error("获取经控贸易人员数据失败:", jingkongResult.error);
-        }
-      } else {
-        console.error("获取经控贸易人员数据失败");
-      }
+      setApiJingkongPersonnel(jingkongPersonnel || []);
+      setApiKaitouPersonnel(kaitouPersonnel || []);
 
-      if (kaitouResponse.ok) {
-        const kaitouResult = await kaitouResponse.json();
-        if (kaitouResult.success) {
-          setApiKaitouPersonnel(kaitouResult.data || []);
-        } else {
-          console.error("获取开投贸易人员数据失败:", kaitouResult.error);
-        }
-      } else {
-        console.error("获取开投贸易人员数据失败");
-      }
+      console.log(
+        "使用本地人员数据，经控贸易:",
+        jingkongPersonnel.length,
+        "人，开投贸易:",
+        kaitouPersonnel.length,
+        "人"
+      );
     } catch (error) {
-      console.error("加载人员数据失败:", error);
+      console.error("加载本地人员数据失败:", error);
+      // 设置为空数组作为后备
+      setApiJingkongPersonnel([]);
+      setApiKaitouPersonnel([]);
     }
   };
 
@@ -68,7 +64,7 @@ export function AdminDashboard() {
     try {
       // 同时加载评价数据和人员数据
       const [evaluationsResponse] = await Promise.all([
-        fetch("/api/evaluations?stats=true"),
+        fetch("/api/user-evaluations?stats=true"),
         loadPersonnelData(),
       ]);
 
@@ -128,15 +124,21 @@ export function AdminDashboard() {
   };
 
   // 获取人员姓名的函数
-  const getPersonnelName = (personnelId) => {
+  const getPersonName = (personnelId) => {
+    // 使用本地人员数据查找
+    const {
+      jingkongPersonnel,
+      kaitouPersonnel,
+    } = require("@/data/personnelData");
+
     // 在经控贸易人员中查找
-    const jingkongPerson = apiJingkongPersonnel.find(
+    const jingkongPerson = jingkongPersonnel.find(
       (p) => p.id === personnelId || p.name === personnelId
     );
     if (jingkongPerson) return jingkongPerson.name;
 
     // 在开投贸易人员中查找
-    const kaitouPerson = apiKaitouPersonnel.find(
+    const kaitouPerson = kaitouPersonnel.find(
       (p) => p.id === personnelId || p.name === personnelId
     );
     if (kaitouPerson) return kaitouPerson.name;
@@ -153,10 +155,32 @@ export function AdminDashboard() {
 
       // 检查是否是有效的部门前缀
       if (["jingkong", "kaitou", "functional"].includes(prefix)) {
-        // 尝试在所有人员中查找匹配的哈希值
-        const allPersonnel = [...apiJingkongPersonnel, ...apiKaitouPersonnel];
+        // 对于职能部门，从functionalPersonnel中查找
+        if (prefix === "functional") {
+          for (const person of functionalPersonnel) {
+            // 模拟加密过程来匹配
+            const createHash = (str) => {
+              let hash = 0;
+              if (str.length === 0) return hash;
+              for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = (hash << 5) - hash + char;
+                hash = hash & hash;
+              }
+              return Math.abs(hash);
+            };
 
-        for (const person of allPersonnel) {
+            const combinedHash = createHash(`${person.name}_functional`);
+            const encryptedId = `functional_${combinedHash}`;
+
+            if (encryptedId === userId) {
+              return person.name;
+            }
+          }
+        }
+
+        // 对于经控贸易和开投贸易，在对应部门人员中查找
+        for (const person of apiJingkongPersonnel) {
           // 模拟加密过程来匹配
           const createHash = (str) => {
             let hash = 0;
@@ -169,9 +193,7 @@ export function AdminDashboard() {
             return Math.abs(hash);
           };
 
-          const department = apiJingkongPersonnel.includes(person)
-            ? "jingkong"
-            : "kaitou";
+          const department = "jingkong";
           const combinedHash = createHash(`${person.name}_${department}`);
           const encryptedId = `${department}_${combinedHash}`;
 
@@ -180,15 +202,35 @@ export function AdminDashboard() {
           }
         }
 
-        // 对于职能部门，可能不在人员列表中，尝试从localStorage获取
-        if (prefix === "functional") {
-          const savedNames = JSON.parse(
-            localStorage.getItem("functionalUserNames") || "{}"
-          );
-          for (const [name, savedId] of Object.entries(savedNames)) {
-            if (savedId === userId) {
-              return name;
+        for (const person of apiKaitouPersonnel) {
+          // 模拟加密过程来匹配
+          const createHash = (str) => {
+            let hash = 0;
+            if (str.length === 0) return hash;
+            for (let i = 0; i < str.length; i++) {
+              const char = str.charCodeAt(i);
+              hash = (hash << 5) - hash + char;
+              hash = hash & hash;
             }
+            return Math.abs(hash);
+          };
+
+          const department = "kaitou";
+          const combinedHash = createHash(`${person.name}_${department}`);
+          const encryptedId = `${department}_${combinedHash}`;
+
+          if (encryptedId === userId) {
+            return person.name;
+          }
+        }
+
+        // 如果还是找不到，尝试从localStorage获取
+        const savedNames = JSON.parse(
+          localStorage.getItem("functionalUserNames") || "{}"
+        );
+        for (const [name, savedId] of Object.entries(savedNames)) {
+          if (savedId === userId) {
+            return name;
           }
         }
       }
@@ -228,7 +270,7 @@ export function AdminDashboard() {
     const personnelName =
       typeof personnel === "string" ? personnel : personnel.name;
 
-    // 尝试直接用 ID 查找
+    // 直接从stats.personnel中查找匹配的人员评价数据
     if (stats.personnel[personnelId]) {
       return stats.personnel[personnelId];
     }
@@ -238,46 +280,21 @@ export function AdminDashboard() {
       return stats.personnel[personnelName];
     }
 
-    // 如果直接查找失败，遍历所有评价数据，查找匹配的人员
-    // 收集所有评价数据，查找匹配的人员
-    let allEvaluations = [];
-    for (const [key, value] of Object.entries(stats.personnel)) {
-      if (value.evaluations && Array.isArray(value.evaluations)) {
-        allEvaluations = allEvaluations.concat(value.evaluations);
-      }
-    }
-
-    // 查找匹配的评价（先尝试匹配 ID，再尝试匹配名称）
-    const matchingEvaluations = allEvaluations.filter((evaluation) => {
-      return (
-        evaluation.personnel_id === personnelId ||
-        evaluation.personnel_id === personnelName
-      );
-    });
-
-    if (matchingEvaluations.length > 0) {
-      // 重新计算统计数据
-      const totalScore = matchingEvaluations.reduce(
-        (sum, e) => sum + e.total_score,
-        0
-      );
-      const averageScore = (totalScore / matchingEvaluations.length).toFixed(1);
-
-      return {
-        count: matchingEvaluations.length,
-        totalScore: totalScore,
-        averageScore: averageScore,
-        evaluations: matchingEvaluations,
-      };
-    }
-
     return null;
   };
 
   // 导出Excel功能
   const exportToExcel = (department, role) => {
-    if (!stats || !stats.users) {
-      alert("没有数据可导出");
+    console.log("Excel导出开始:", { department, role });
+    console.log("Stats数据:", stats);
+
+    if (!stats) {
+      alert("没有统计数据可导出");
+      return;
+    }
+
+    if (!stats.users || Object.keys(stats.users).length === 0) {
+      alert("没有用户数据可导出");
       return;
     }
 
@@ -287,7 +304,18 @@ export function AdminDashboard() {
     // 获取指定部门的人员（作为列）
     const departmentPersonnel =
       department === "jingkong" ? apiJingkongPersonnel : apiKaitouPersonnel;
+
+    console.log("部门人员数据:", departmentPersonnel);
+
+    if (!departmentPersonnel || departmentPersonnel.length === 0) {
+      alert(
+        `没有${department === "jingkong" ? "经控贸易" : "开投贸易"}人员数据`
+      );
+      return;
+    }
+
     const personnelColumns = departmentPersonnel.map((p) => p.name);
+    console.log("人员列:", personnelColumns);
 
     // 表头：第一列为"评价人"，后面各列为被评价人员姓名
     const header = ["评价人", ...personnelColumns];
@@ -308,6 +336,13 @@ export function AdminDashboard() {
       );
     }
 
+    console.log("筛选后的用户:", filteredUsers);
+
+    if (filteredUsers.length === 0) {
+      alert(`没有找到符合条件的用户: 角色=${role}, 部门=${department}`);
+      return;
+    }
+
     // 为每个用户创建一行数据
     filteredUsers.forEach(([userId, userStats]) => {
       const row = [userId]; // 第一列是评价人ID
@@ -317,10 +352,20 @@ export function AdminDashboard() {
         const person = departmentPersonnel.find((p) => p.name === personName);
         if (person) {
           const evaluation = getPersonnelEvaluations(person);
-          const userEvaluation = evaluation?.evaluations?.find(
-            (e) => e.role === role && e.user_id === userId
-          );
-          row.push(userEvaluation ? userEvaluation.total_score : "");
+          console.log(`人员 ${personName} 的评价数据:`, evaluation);
+
+          if (evaluation && evaluation.evaluations) {
+            const userEvaluation = evaluation.evaluations.find(
+              (e) => e.userRole === role && e.userId === userId
+            );
+            console.log(
+              `用户 ${userId} 对 ${personName} 的评价:`,
+              userEvaluation
+            );
+            row.push(userEvaluation ? userEvaluation.totalScore : "");
+          } else {
+            row.push("");
+          }
         } else {
           row.push("");
         }
@@ -336,12 +381,12 @@ export function AdminDashboard() {
       if (person) {
         const evaluation = getPersonnelEvaluations(person);
         const roleEvaluations = evaluation?.evaluations?.filter(
-          (e) => e.role === role
+          (e) => e.userRole === role
         );
 
         if (roleEvaluations && roleEvaluations.length > 0) {
           const totalScore = roleEvaluations.reduce(
-            (sum, e) => sum + e.total_score,
+            (sum, e) => sum + (e.totalScore || 0),
             0
           );
           const averageScore = (totalScore / roleEvaluations.length).toFixed(1);
@@ -354,6 +399,8 @@ export function AdminDashboard() {
       }
     });
     sheetData.push(averageRow);
+
+    console.log("Excel数据:", sheetData);
 
     // 将数据添加到工作簿
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
@@ -379,6 +426,7 @@ export function AdminDashboard() {
 
     // 导出文件
     XLSX.writeFile(wb, fileName);
+    console.log("Excel导出完成:", fileName);
   };
 
   if (loading) {
@@ -467,12 +515,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   部门
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -496,26 +538,7 @@ export function AdminDashboard() {
                                         </div>
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        经控贸易
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
-                                        {userStats.evaluations[0]
-                                          ? new Date(
-                                              userStats.evaluations[0].timestamp
-                                            ).toLocaleString("zh-CN")
-                                          : "无"}
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        {userStats.evaluations &&
-                                        userStats.evaluations.length > 0 ? (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            已完成
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            未完成
-                                          </span>
-                                        )}
+                                        职能部门
                                       </td>
                                     </tr>
                                   ))}
@@ -560,12 +583,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   部门
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -590,25 +607,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         经控贸易
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
-                                        {userStats.evaluations[0]
-                                          ? new Date(
-                                              userStats.evaluations[0].timestamp
-                                            ).toLocaleString("zh-CN")
-                                          : "无"}
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        {userStats.evaluations &&
-                                        userStats.evaluations.length > 0 ? (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            已完成
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            未完成
-                                          </span>
-                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -660,12 +658,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   部门
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -690,25 +682,6 @@ export function AdminDashboard() {
                                       </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         开投贸易
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
-                                        {userStats.evaluations[0]
-                                          ? new Date(
-                                              userStats.evaluations[0].timestamp
-                                            ).toLocaleString("zh-CN")
-                                          : "无"}
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        {userStats.evaluations &&
-                                        userStats.evaluations.length > 0 ? (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            已完成
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            未完成
-                                          </span>
-                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -753,12 +726,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   部门
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -782,26 +749,7 @@ export function AdminDashboard() {
                                         </div>
                                       </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
-                                        开投贸易
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
-                                        {userStats.evaluations[0]
-                                          ? new Date(
-                                              userStats.evaluations[0].timestamp
-                                            ).toLocaleString("zh-CN")
-                                          : "无"}
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        {userStats.evaluations &&
-                                        userStats.evaluations.length > 0 ? (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            已完成
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            未完成
-                                          </span>
-                                        )}
+                                        职能部门
                                       </td>
                                     </tr>
                                   ))}
@@ -854,12 +802,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   部门
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -869,10 +811,15 @@ export function AdminDashboard() {
                                     ([_, user]) => user.role === "functional"
                                   )
                                   .map(([userId, userStats]) => {
+                                    // 将evaluations对象转换为数组
+                                    const evaluationsArray =
+                                      userStats.evaluations
+                                        ? Object.values(userStats.evaluations)
+                                        : [];
                                     const jingkongEvals =
-                                      userStats.evaluations?.filter(
+                                      evaluationsArray.filter(
                                         (e) => e.department === "jingkong"
-                                      ) || [];
+                                      );
 
                                     return (
                                       <tr key={userId}>
@@ -888,28 +835,6 @@ export function AdminDashboard() {
                                         </td>
                                         <td className="border border-blue-200 px-4 py-2 text-sm">
                                           经控贸易
-                                        </td>
-                                        <td className="border border-blue-200 px-4 py-2 text-sm text-gray-600">
-                                          {jingkongEvals.length > 0
-                                            ? new Date(
-                                                Math.max(
-                                                  ...jingkongEvals.map(
-                                                    (e) => new Date(e.timestamp)
-                                                  )
-                                                )
-                                              ).toLocaleString("zh-CN")
-                                            : "无"}
-                                        </td>
-                                        <td className="border border-blue-200 px-4 py-2 text-sm">
-                                          {jingkongEvals.length > 0 ? (
-                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                              已完成
-                                            </span>
-                                          ) : (
-                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                              未完成
-                                            </span>
-                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -952,12 +877,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   部门
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  投票时间
-                                </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  完成状态
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -967,10 +886,14 @@ export function AdminDashboard() {
                                     ([_, user]) => user.role === "functional"
                                   )
                                   .map(([userId, userStats]) => {
-                                    const kaitouEvals =
-                                      userStats.evaluations?.filter(
-                                        (e) => e.department === "kaitou"
-                                      ) || [];
+                                    // 将evaluations对象转换为数组
+                                    const evaluationsArray =
+                                      userStats.evaluations
+                                        ? Object.values(userStats.evaluations)
+                                        : [];
+                                    const kaitouEvals = evaluationsArray.filter(
+                                      (e) => e.department === "kaitou"
+                                    );
 
                                     return (
                                       <tr key={userId}>
@@ -986,28 +909,6 @@ export function AdminDashboard() {
                                         </td>
                                         <td className="border border-green-200 px-4 py-2 text-sm">
                                           开投贸易
-                                        </td>
-                                        <td className="border border-green-200 px-4 py-2 text-sm text-gray-600">
-                                          {kaitouEvals.length > 0
-                                            ? new Date(
-                                                Math.max(
-                                                  ...kaitouEvals.map(
-                                                    (e) => new Date(e.timestamp)
-                                                  )
-                                                )
-                                              ).toLocaleString("zh-CN")
-                                            : "无"}
-                                        </td>
-                                        <td className="border border-green-200 px-4 py-2 text-sm">
-                                          {kaitouEvals.length > 0 ? (
-                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                              已完成
-                                            </span>
-                                          ) : (
-                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                              未完成
-                                            </span>
-                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -1089,7 +990,7 @@ export function AdminDashboard() {
                             {evaluation.total_score}分
                           </td>
                           <td className="border border-gray-200 px-4 py-2 text-sm text-gray-600">
-                            {new Date(evaluation.timestamp).toLocaleString(
+                            {new Date(evaluation.updatedAt).toLocaleString(
                               "zh-CN"
                             )}
                           </td>
