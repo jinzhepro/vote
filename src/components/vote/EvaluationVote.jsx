@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 import { getPersonnelByDepartment } from "@/data/personnelData";
 
 export function EvaluationVote({ department, onBack, initialPersonId }) {
+  const router = useRouter();
   const [personnel, setPersonnel] = useState([]);
   const [criteria, setCriteria] = useState({});
   const [selectedPerson, setSelectedPerson] = useState(initialPersonId || "");

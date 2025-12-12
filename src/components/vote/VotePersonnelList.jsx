@@ -56,13 +56,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     }
 
     // 如果没有保存的userId，返回首页
-    if (!savedUserId) {
-      router.push("/");
-      return null;
-    }
-
-    setUserId(savedUserId);
-    return savedUserId;
+    router.push("/");
+    return null;
   };
 
   // 从本地存储加载评价数据

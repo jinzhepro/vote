@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { Footer } from "@/components/ui/footer";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,9 +25,11 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <div className="flex-1">{children}</div>
-        <Footer />
-        <Toaster position="top-center" />
+        <ErrorBoundary>
+          <div className="flex-1">{children}</div>
+          <Footer />
+          <Toaster position="top-center" />
+        </ErrorBoundary>
       </body>
     </html>
   );

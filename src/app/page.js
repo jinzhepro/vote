@@ -19,6 +19,7 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("表单提交开始");
 
     if (!name.trim()) {
       toast.error("请输入姓名");
@@ -37,6 +38,10 @@ export default function Home() {
     }
 
     setLoading(true);
+    console.log("开始查找人员信息:", {
+      name: name.trim(),
+      idCard: idCard.trim(),
+    });
 
     try {
       // 根据姓名和身份证号查找人员信息
@@ -45,8 +50,11 @@ export default function Home() {
         idCard.trim()
       );
 
+      console.log("查找结果:", person);
+
       if (!person) {
         toast.error("未找到该姓名和身份证号对应的人员信息");
+        setLoading(false);
         return;
       }
 
@@ -56,14 +64,37 @@ export default function Home() {
         person.department
       );
 
-      localStorage.setItem("userId", encryptedUserId);
+      console.log("生成的用户ID:", encryptedUserId);
+
+      // 确保localStorage可用
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          localStorage.setItem("userId", encryptedUserId);
+          console.log("用户ID已保存到localStorage");
+        } catch (error) {
+          console.error("保存到localStorage失败:", error);
+          toast.error("浏览器本地存储不可用，请更换浏览器");
+          setLoading(false);
+          return;
+        }
+      } else {
+        console.error("localStorage不可用");
+        toast.error("浏览器不支持本地存储，请更换浏览器");
+        setLoading(false);
+        return;
+      }
+
+      // 延迟一下确保数据保存完成
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // 如果是职能部门，跳转到部门选择页面
       if (person.department === "functional") {
+        console.log("跳转到职能部门选择页面");
         router.push(`/vote/functional/select-department`);
       } else {
         // 其他部门直接跳转到对应页面
         const role = person.role || "employee";
+        console.log("跳转到部门页面:", `/vote/${person.department}/${role}`);
         router.push(`/vote/${person.department}/${role}`);
       }
     } catch (error) {
@@ -85,6 +116,11 @@ export default function Home() {
             <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
               请输入您的姓名和身份证号进入评价系统。
             </p>
+            <div className="text-sm text-gray-500">
+              <a href="/test-login" className="text-blue-600 hover:underline">
+                测试登录（点击查看可用用户）
+              </a>
+            </div>
           </div>
 
           {/* 姓名输入表单 */}

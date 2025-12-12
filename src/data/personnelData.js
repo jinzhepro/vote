@@ -28,11 +28,14 @@ export const validateIdCard = (idCard) => {
 // 根据姓名和身份证号获取人员信息的函数
 export const getPersonnelByNameAndIdCard = async (name, idCard) => {
   try {
+    console.log("查找人员:", { name, idCard });
+
     // 优先从职能部门查找
     let person = functionalPersonnel.find(
       (p) => p.name === name && p.idCard === idCard
     );
     if (person) {
+      console.log("在职能部门找到人员:", person);
       return {
         id: person.id,
         name: person.name,
@@ -48,6 +51,7 @@ export const getPersonnelByNameAndIdCard = async (name, idCard) => {
       (p) => p.name === name && p.idCard === idCard
     );
     if (person) {
+      console.log("在经控贸易部门找到人员:", person);
       return {
         id: person.id,
         name: person.name,
@@ -63,6 +67,7 @@ export const getPersonnelByNameAndIdCard = async (name, idCard) => {
       (p) => p.name === name && p.idCard === idCard
     );
     if (person) {
+      console.log("在开投贸易部门找到人员:", person);
       return {
         id: person.id,
         name: person.name,
@@ -73,6 +78,7 @@ export const getPersonnelByNameAndIdCard = async (name, idCard) => {
       };
     }
 
+    console.log("未找到匹配的人员");
     return null;
   } catch (error) {
     console.error("根据姓名和身份证号获取人员信息失败:", error);
