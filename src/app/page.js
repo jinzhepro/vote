@@ -45,10 +45,7 @@ export default function Home() {
 
     try {
       // 根据姓名和身份证号查找人员信息
-      const person = await getPersonnelByNameAndIdCard(
-        name.trim(),
-        idCard.trim()
-      );
+      const person = getPersonnelByNameAndIdCard(name.trim(), idCard.trim());
 
       console.log("查找结果:", person);
 
@@ -83,9 +80,6 @@ export default function Home() {
         setLoading(false);
         return;
       }
-
-      // 延迟一下确保数据保存完成
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // 如果是职能部门，跳转到部门选择页面
       if (person.department === "functional") {

@@ -26,7 +26,7 @@ export const validateIdCard = (idCard) => {
 };
 
 // 根据姓名和身份证号获取人员信息的函数
-export const getPersonnelByNameAndIdCard = async (name, idCard) => {
+export const getPersonnelByNameAndIdCard = (name, idCard) => {
   try {
     console.log("查找人员:", { name, idCard });
 
