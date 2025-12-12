@@ -226,4 +226,5 @@ export const functionalPersonnel = [
   { id: "FN002", name: "敬志伟", role: "leader" },
   { id: "FN003", name: "陈立群", role: "leader" },
   { id: "FN004", name: "纪明霞", role: "leader" },
+  { id: "FN005", name: "贾松涛", role: "leader" },
 ];
