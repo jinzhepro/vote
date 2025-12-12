@@ -313,6 +313,43 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return stats;
   };
 
+  // 动态获取部门等级分布要求文案
+  const getDepartmentDistributionText = (dept) => {
+    if (dept === "jingkong") {
+      return "经控贸易部门等级分布要求：A优秀≤11人，B良好=23-26人，C合格=18-21人，D基本合格+E不合格=3-6人";
+    } else if (dept === "kaitou") {
+      return "开投贸易部门等级分布要求：A优秀≤4人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人";
+    } else {
+      return "职能部门等级分布要求：A优秀≤1人，B良好=2-3人，C合格=1-2人，D基本合格+E不合格=0-1人";
+    }
+  };
+
+  // 动态获取部门等级分布限制
+  const getDepartmentDistributionLimits = (dept) => {
+    if (dept === "jingkong") {
+      return {
+        A: { max: 11, text: "≤11人" },
+        B: { min: 23, max: 26, text: "23-26人" },
+        C: { min: 18, max: 21, text: "18-21人" },
+        DE: { min: 3, max: 6, text: "3-6人" },
+      };
+    } else if (dept === "kaitou") {
+      return {
+        A: { max: 4, text: "≤4人" },
+        B: { min: 9, max: 11, text: "9-11人" },
+        C: { min: 6, max: 8, text: "6-8人" },
+        DE: { min: 1, max: 3, text: "1-3人" },
+      };
+    } else {
+      return {
+        A: { max: 1, text: "≤1人" },
+        B: { min: 2, max: 3, text: "2-3人" },
+        C: { min: 1, max: 2, text: "1-2人" },
+        DE: { min: 0, max: 1, text: "0-1人" },
+      };
+    }
+  };
+
   const getTypeColor = (type) => {
     const colors = {
       经控贸易: "bg-blue-100 text-blue-800",
@@ -438,10 +475,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               </Button>
             </div>
 
-            {/* 等级分布状态 - 对经控贸易、开投贸易和职能部门显示 */}
-            {(department === "jingkong" ||
-              department === "kaitou" ||
-              department === "functional") && (
+            {/* 等级分布状态 - 仅对经控贸易和开投贸易显示 */}
+            {(department === "jingkong" || department === "kaitou") && (
               <Card
                 className={(() => {
                   const validation = validateGradeDistribution(
@@ -502,13 +537,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                   </div>
                   <CardDescription>
                     <div className="space-y-1">
-                      <div>
-                        {department === "jingkong"
-                          ? "经控贸易部门等级分布要求：A优秀≤11人，B良好=23-26人，C合格=18-21人，D基本合格+E不合格=3-6人"
-                          : department === "kaitou"
-                          ? "开投贸易部门等级分布要求：A优秀≤3人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人"
-                          : "职能部门等级分布要求：A优秀≤1人，B良好=2-3人，C合格=1-2人，D基本合格+E不合格=0-1人"}
-                      </div>
+                      <div>{getDepartmentDistributionText(department)}</div>
                       {department === "jingkong" && (
                         <div className="text-blue-600 font-medium">
                           绩效考核最终成绩＝部门负责人评估成绩×70%＋其他员工评估成绩×30%
@@ -555,21 +584,15 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
-                              let limit;
-                              if (department === "jingkong") limit = 11;
-                              else if (department === "kaitou") limit = 3;
-                              else limit = 1; // functional
-                              return stats.A.count <= limit
+                              const limits =
+                                getDepartmentDistributionLimits(department);
+                              return stats.A.count <= limits.A.max
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().A.count}人 /{" "}
-                            {department === "jingkong"
-                              ? "≤11人"
-                              : department === "kaitou"
-                              ? "≤3人"
-                              : "≤1人"}
+                            {getDepartmentDistributionLimits(department).A.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -577,24 +600,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
+                              const limits =
+                                getDepartmentDistributionLimits(department);
                               const bCount = stats.B.count;
-                              let isValid;
-                              if (department === "jingkong")
-                                isValid = bCount >= 23 && bCount <= 26;
-                              else if (department === "kaitou")
-                                isValid = bCount >= 9 && bCount <= 11;
-                              else isValid = bCount >= 2 && bCount <= 3; // functional
-                              return isValid
+                              return bCount >= limits.B.min &&
+                                bCount <= limits.B.max
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().B.count}人 /{" "}
-                            {department === "jingkong"
-                              ? "23-26人"
-                              : department === "kaitou"
-                              ? "9-11人"
-                              : "2-3人"}
+                            {getDepartmentDistributionLimits(department).B.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -602,24 +618,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
+                              const limits =
+                                getDepartmentDistributionLimits(department);
                               const cCount = stats.C.count;
-                              let isValid;
-                              if (department === "jingkong")
-                                isValid = cCount >= 18 && cCount <= 21;
-                              else if (department === "kaitou")
-                                isValid = cCount >= 6 && cCount <= 8;
-                              else isValid = cCount >= 1 && cCount <= 2; // functional
-                              return isValid
+                              return cCount >= limits.C.min &&
+                                cCount <= limits.C.max
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
                           >
                             {getGradeStatistics().C.count}人 /{" "}
-                            {department === "jingkong"
-                              ? "18-21人"
-                              : department === "kaitou"
-                              ? "6-8人"
-                              : "1-2人"}
+                            {getDepartmentDistributionLimits(department).C.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -627,14 +636,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                           <span
                             className={(() => {
                               const stats = getGradeStatistics();
+                              const limits =
+                                getDepartmentDistributionLimits(department);
                               const deCount = stats.D.count + stats.E.count;
-                              let isValid;
-                              if (department === "jingkong")
-                                isValid = deCount >= 3 && deCount <= 6;
-                              else if (department === "kaitou")
-                                isValid = deCount >= 1 && deCount <= 3;
-                              else isValid = deCount >= 0 && deCount <= 1; // functional
-                              return isValid
+                              return deCount >= limits.DE.min &&
+                                deCount <= limits.DE.max
                                 ? "text-green-600"
                                 : "text-red-600";
                             })()}
@@ -642,11 +648,10 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                             {getGradeStatistics().D.count +
                               getGradeStatistics().E.count}
                             人 /{" "}
-                            {department === "jingkong"
-                              ? "3-6人"
-                              : department === "kaitou"
-                              ? "1-3人"
-                              : "0-1人"}
+                            {
+                              getDepartmentDistributionLimits(department).DE
+                                .text
+                            }
                           </span>
                         </div>
                       </div>

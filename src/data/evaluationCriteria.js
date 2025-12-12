@@ -195,7 +195,7 @@ export const getGradeDetails = () => {
       grade: "优秀",
       letter: "A",
       color: "text-green-600",
-      description: "95分≤优秀≤100分，经控贸易A≤11人，开投贸易A≤3人",
+      description: "95分≤优秀≤100分，经控贸易A≤11人，开投贸易A≤4人",
     },
     {
       min: 85,
@@ -250,7 +250,7 @@ export const validateGradeDistribution = (evaluations, department) => {
   } else if (department === "kaitou") {
     // 开投贸易部门规则
     validationRules = {
-      A: { max: 3, description: "≤3人" },
+      A: { max: 4, description: "≤4人" },
       B: { min: 9, max: 11, description: "9-11人" },
       C: { min: 6, max: 8, description: "6-8人" },
       DE: { min: 1, max: 3, description: "1-3人" },
@@ -454,7 +454,7 @@ export const getGradeDistributionSuggestions = (evaluations, department) => {
     };
   } else if (department === "kaitou") {
     limits = {
-      A: 3,
+      A: 4,
       B: { min: 9, max: 11 },
       C: { min: 6, max: 8 },
       DE: { min: 1, max: 3 },

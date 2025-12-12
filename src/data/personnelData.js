@@ -479,12 +479,6 @@ export const kaitouPersonnel = [
   },
   { id: "KT011", name: "高青", role: "employee", idCard: "370211199001040018" },
   { id: "KT012", name: "纪蕾", role: "employee", idCard: "370211198504170020" },
-  {
-    id: "KT013",
-    name: "田大雷",
-    role: "employee",
-    idCard: "370705197905201014",
-  },
   { id: "KT014", name: "王杰", role: "employee", idCard: "370284199411224336" },
   {
     id: "KT015",
