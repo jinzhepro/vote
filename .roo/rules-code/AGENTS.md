@@ -27,7 +27,7 @@
 ## 数据结构要求
 
 - 评价数据必须包含 scores、totalScore、timestamp 字段
-- 人员数据必须包含 id、name、department、role 字段
+- 人员数据必须包含 id、name、department、role、idCard 字段
 - localStorage 中的 localEvaluations 必须按 userId 组织
 
 ## 特殊处理逻辑
@@ -35,3 +35,5 @@
 - 职能部门用户需要选择评价部门
 - 经控贸易和开投贸易用户自动评价自己部门
 - 评价完成后自动跳转到下一个未评价人员
+- 登录时必须验证姓名和身份证号的匹配关系
+- 身份证号验证包含格式检查和校验码验证

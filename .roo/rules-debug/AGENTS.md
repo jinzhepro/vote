@@ -18,6 +18,8 @@
 - 控制台查看评价数据：`console.log(JSON.parse(localStorage.getItem('localEvaluations')))`
 - 检查用户身份验证：`console.log(localStorage.getItem('userId'))`
 - 验证等级分布：在`src/data/evaluationCriteria.js`中的`validateGradeDistribution()`函数
+- 测试身份证号验证：在控制台运行`validateIdCard('身份证号')`检查格式和校验码
+- 查找人员信息：`getPersonnelByNameAndIdCard('姓名', '身份证号')`验证匹配关系
 
 ## 网络请求调试
 
@@ -34,5 +36,6 @@
 ## 错误处理调试
 
 - 评价提交失败：检查等级分布验证结果
-- 用户身份验证失败：检查姓名是否在人员数据中存在
+- 用户身份验证失败：检查姓名是否在人员数据中存在，验证身份证号格式和匹配关系
 - 数据同步问题：检查本地存储格式是否正确
+- 身份证号验证失败：检查格式是否为 18 位，校验码是否正确

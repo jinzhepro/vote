@@ -4,12 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getPersonnelByName } from "@/data/personnelData";
+import {
+  getPersonnelByNameAndIdCard,
+  validateIdCard,
+} from "@/data/personnelData";
 import { toast } from "sonner";
 import { generateEncryptedUserId } from "@/lib/encryption";
 
 export default function Home() {
   const [name, setName] = useState("");
+  const [idCard, setIdCard] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -21,14 +25,28 @@ export default function Home() {
       return;
     }
 
+    if (!idCard.trim()) {
+      toast.error("请输入身份证号");
+      return;
+    }
+
+    // 验证身份证号格式
+    if (!validateIdCard(idCard.trim())) {
+      toast.error("身份证号格式不正确");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 根据姓名查找人员信息
-      const person = await getPersonnelByName(name.trim());
+      // 根据姓名和身份证号查找人员信息
+      const person = await getPersonnelByNameAndIdCard(
+        name.trim(),
+        idCard.trim()
+      );
 
       if (!person) {
-        toast.error("未找到该姓名对应的人员信息");
+        toast.error("未找到该姓名和身份证号对应的人员信息");
         return;
       }
 
@@ -65,7 +83,7 @@ export default function Home() {
               2025年度员工绩效考核
             </h1>
             <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-              请输入您的姓名进入评价系统。
+              请输入您的姓名和身份证号进入评价系统。
             </p>
           </div>
 
@@ -89,12 +107,30 @@ export default function Home() {
                   disabled={loading}
                 />
               </div>
+              <div>
+                <label
+                  htmlFor="idCard"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  身份证号
+                </label>
+                <Input
+                  id="idCard"
+                  type="text"
+                  value={idCard}
+                  onChange={(e) => setIdCard(e.target.value)}
+                  placeholder="请输入您的身份证号"
+                  className="w-full"
+                  disabled={loading}
+                  maxLength={18}
+                />
+              </div>
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !name.trim()}
+                disabled={loading || !name.trim() || !idCard.trim()}
               >
-                {loading ? "查找中..." : "进入评价系统"}
+                {loading ? "验证中..." : "进入评价系统"}
               </Button>
             </form>
           </div>

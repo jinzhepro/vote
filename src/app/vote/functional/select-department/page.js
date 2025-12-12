@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { jingkongPersonnel, kaitouPersonnel } from "@/data/personnelData";
 
 export default function FunctionalSelectDepartmentPage() {
   const router = useRouter();
@@ -125,7 +126,7 @@ export default function FunctionalSelectDepartmentPage() {
                   </div>
                   <CardTitle className="text-xl">经控贸易</CardTitle>
                   <CardDescription>
-                    评价经控贸易部门人员（55人）
+                    评价经控贸易部门人员（{jingkongPersonnel.length}人）
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -165,7 +166,7 @@ export default function FunctionalSelectDepartmentPage() {
                   </div>
                   <CardTitle className="text-xl">开投贸易</CardTitle>
                   <CardDescription>
-                    评价开投贸易部门人员（21人）
+                    评价开投贸易部门人员（{kaitouPersonnel.length}人）
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

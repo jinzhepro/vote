@@ -42,6 +42,8 @@ npm run fix:rls               # 修复行级安全策略
 - 使用`generateEncryptedUserId()`函数基于姓名和部门生成加密的用户 ID
 - 用户 ID 格式：`{department}_{hash}`，例如`jingkong_123456789`
 - 用户身份信息存储在 localStorage 的`userId`字段中
+- 登录时需要验证姓名和身份证号的匹配关系
+- 身份证号验证使用`validateIdCard()`函数，包含格式和校验码验证
 
 ### 部门和角色系统
 
@@ -90,6 +92,11 @@ npm run fix:rls               # 修复行级安全策略
 - `generateEncryptedUserId(name, department)`: 生成基于姓名和部门的加密用户 ID
 - `validateUserId(userId, name, department)`: 验证用户 ID 是否匹配
 
+### 身份验证工具 (`src/data/personnelData.js`)
+
+- `validateIdCard(idCard)`: 验证身份证号格式和校验码
+- `getPersonnelByNameAndIdCard(name, idCard)`: 根据姓名和身份证号查找人员信息
+
 ### 评价工具 (`src/data/evaluationCriteria.js`)
 
 - `calculateTotalScore(evaluations)`: 计算评价总分
@@ -137,6 +144,8 @@ NEXT_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
 ### 用户身份验证失败
 
 - 检查姓名是否在人员数据中存在
+- 确认身份证号格式是否正确
+- 验证姓名和身份证号是否匹配
 - 确认部门信息是否正确
 - 验证加密函数是否正常工作
 
