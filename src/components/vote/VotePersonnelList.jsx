@@ -46,9 +46,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const [clearAllDialogOpen, setClearAllDialogOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // 确保只在客户端执行
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // 获取已保存的用户ID
   const getUserId = () => {
+    if (typeof window === "undefined") return null;
+
     const savedUserId = localStorage.getItem("userId");
     if (savedUserId) {
       setUserId(savedUserId);
@@ -62,7 +70,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 从本地存储加载评价数据
   const loadEvaluationsFromLocal = () => {
+    if (typeof window === "undefined") return {};
+
     const currentUserId = userId || getUserId();
+    if (!currentUserId) return {};
+
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
@@ -90,7 +102,10 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 获取用户评价历史（从本地存储）
   const fetchUserEvaluations = async () => {
+    if (typeof window === "undefined") return;
+
     const currentUserId = userId || getUserId();
+    if (!currentUserId) return;
 
     // 直接从本地存储获取评价数据
     try {
@@ -104,7 +119,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 清空所有评价数据
   const clearAllEvaluations = () => {
+    if (typeof window === "undefined") return;
+
     const currentUserId = userId || getUserId();
+    if (!currentUserId) return;
+
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
@@ -122,7 +141,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
   // 提交所有评价到服务器
   const submitAllEvaluations = async () => {
+    if (typeof window === "undefined") return;
+
     const currentUserId = userId || getUserId();
+    if (!currentUserId) return;
+
     const localEvaluations = JSON.parse(
       localStorage.getItem("localEvaluations") || "{}"
     );
@@ -254,6 +277,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   };
 
   useEffect(() => {
+    if (!isClient) return;
+
     const initializeData = () => {
       setLoading(true);
       getUserId();
@@ -262,7 +287,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       setLoading(false);
     };
     initializeData();
-  }, [department, role]);
+  }, [department, role, isClient]);
 
   // 使用useMemo计算过滤后的人员列表
   const filteredPersonnel = useMemo(() => {
@@ -309,19 +334,6 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return validateGradeDistribution(userEvaluations, department);
   }, [userEvaluations, department]);
 
-  // 使用useMemo缓存部门分布限制
-  const departmentLimits = useMemo(() => {
-    return getDepartmentDistributionLimits(department);
-  }, [department]);
-
-  // 清除等级过滤
-  const clearGradeFilter = () => {
-    setSelectedGrade(null);
-  };
-
-  // 获取等级统计
-  const getGradeStatistics = () => gradeStatistics;
-
   // 动态获取部门等级分布要求文案
   const getDepartmentDistributionText = (dept) => {
     if (dept === "jingkong") {
@@ -359,6 +371,16 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     }
   };
 
+  // 使用useMemo缓存部门分布限制
+  const departmentLimits = useMemo(() => {
+    return getDepartmentDistributionLimits(department);
+  }, [department]);
+
+  // 清除等级过滤
+  const clearGradeFilter = () => {
+    setSelectedGrade(null);
+  };
+
   const getTypeColor = (type) => {
     const colors = {
       经控贸易: "bg-blue-100 text-blue-800",
@@ -372,6 +394,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   const hasEvaluation = (personId) => {
     return userEvaluations[personId] !== undefined;
   };
+
+  if (!isClient) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">正在加载...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -483,62 +516,44 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
             {/* 等级分布状态 - 仅对经控贸易和开投贸易显示 */}
             {(department === "jingkong" || department === "kaitou") && (
               <Card
-                className={(() => {
-                  const validation = validateGradeDistribution(
-                    userEvaluations,
-                    department
-                  );
-                  return validation.valid
+                className={
+                  gradeValidation.valid
                     ? "border-green-200 bg-green-50"
-                    : "border-red-200 bg-red-50";
-                })()}
+                    : "border-red-200 bg-red-50"
+                }
               >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
                       等级分布状态
-                      {(() => {
-                        const validation = validateGradeDistribution(
-                          userEvaluations,
-                          department
-                        );
-                        return validation.valid ? (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            ✓ 符合要求
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            ⚠ 需要调整
-                          </span>
-                        );
-                      })()}
+                      {gradeValidation.valid ? (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ✓ 符合要求
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          ⚠ 需要调整
+                        </span>
+                      )}
                     </CardTitle>
-                    {(() => {
-                      const validation = validateGradeDistribution(
-                        userEvaluations,
-                        department
-                      );
-                      return (
-                        validation.valid &&
-                        Object.keys(userEvaluations).length > 0 && (
-                          <Button
-                            onClick={submitAllEvaluations}
-                            disabled={submitting}
-                            className="bg-green-600 hover:bg-green-700"
-                            size="sm"
-                          >
-                            {submitting ? (
-                              <LoadingSpinner size="sm" />
-                            ) : (
-                              <>
-                                <UploadIcon className="w-4 h-4 mr-2" />
-                                提交评价
-                              </>
-                            )}
-                          </Button>
-                        )
-                      );
-                    })()}
+                    {gradeValidation.valid &&
+                      Object.keys(userEvaluations).length > 0 && (
+                        <Button
+                          onClick={submitAllEvaluations}
+                          disabled={submitting}
+                          className="bg-green-600 hover:bg-green-700"
+                          size="sm"
+                        >
+                          {submitting ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            <>
+                              <UploadIcon className="w-4 h-4 mr-2" />
+                              提交评价
+                            </>
+                          )}
+                        </Button>
+                      )}
                   </div>
                   <CardDescription>
                     <div className="space-y-1">
@@ -675,8 +690,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 {getGradeDetails().map((grade) => {
-                  const stats = getGradeStatistics();
-                  const gradeStats = stats[grade.letter];
+                  const gradeStats = gradeStatistics[grade.letter];
                   const isSelected = selectedGrade === grade.letter;
 
                   return (
