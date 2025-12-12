@@ -107,7 +107,7 @@ export const getAllPersonnel = async () => {
 };
 
 // 根据部门获取人员名单的函数
-export const getPersonnelByDepartment = async (department) => {
+export const getPersonnelByDepartment = (department) => {
   try {
     // 直接返回本地数据
     if (department === "jingkong") {

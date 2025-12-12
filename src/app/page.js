@@ -14,10 +14,9 @@ import { generateEncryptedUserId } from "@/lib/encryption";
 export default function Home() {
   const [name, setName] = useState("");
   const [idCard, setIdCard] = useState("");
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     console.log("表单提交开始");
 
@@ -37,7 +36,6 @@ export default function Home() {
       return;
     }
 
-    setLoading(true);
     console.log("开始查找人员信息:", {
       name: name.trim(),
       idCard: idCard.trim(),
@@ -51,7 +49,6 @@ export default function Home() {
 
       if (!person) {
         toast.error("未找到该姓名和身份证号对应的人员信息");
-        setLoading(false);
         return;
       }
 
@@ -71,13 +68,11 @@ export default function Home() {
         } catch (error) {
           console.error("保存到localStorage失败:", error);
           toast.error("浏览器本地存储不可用，请更换浏览器");
-          setLoading(false);
           return;
         }
       } else {
         console.error("localStorage不可用");
         toast.error("浏览器不支持本地存储，请更换浏览器");
-        setLoading(false);
         return;
       }
 
@@ -94,8 +89,6 @@ export default function Home() {
     } catch (error) {
       console.error("查找人员失败:", error);
       toast.error("查找人员失败，请重试");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,11 +103,6 @@ export default function Home() {
             <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
               请输入您的姓名和身份证号进入评价系统。
             </p>
-            <div className="text-sm text-gray-500">
-              <a href="/test-login" className="text-blue-600 hover:underline">
-                测试登录（点击查看可用用户）
-              </a>
-            </div>
           </div>
 
           {/* 姓名输入表单 */}
@@ -134,7 +122,6 @@ export default function Home() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="请输入您的姓名"
                   className="w-full"
-                  disabled={loading}
                 />
               </div>
               <div>
@@ -151,16 +138,15 @@ export default function Home() {
                   onChange={(e) => setIdCard(e.target.value.toUpperCase())}
                   placeholder="请输入您的身份证号（不区分大小写）"
                   className="w-full"
-                  disabled={loading}
                   maxLength={18}
                 />
               </div>
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !name.trim() || !idCard.trim()}
+                disabled={!name.trim() || !idCard.trim()}
               >
-                {loading ? "验证中..." : "进入评价系统"}
+                进入评价系统
               </Button>
             </form>
           </div>

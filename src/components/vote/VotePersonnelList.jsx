@@ -232,16 +232,17 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   };
 
   // 获取部门人员（从本地数据）
-  const fetchPersonnel = async () => {
+  const fetchPersonnel = () => {
     try {
       // 使用本地人员数据
-      const personnelData = await getPersonnelByDepartment(department);
+      const personnelData = getPersonnelByDepartment(department);
+      const departmentName = getDepartmentName();
 
       // 为每个人员添加额外的属性
       const personnelObjects = personnelData.map((person) => ({
         ...person,
-        type: getDepartmentName(),
-        department: getDepartmentName(),
+        type: departmentName,
+        department: departmentName,
       }));
 
       setPersonnel(personnelObjects);
@@ -253,11 +254,11 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
   };
 
   useEffect(() => {
-    const initializeData = async () => {
+    const initializeData = () => {
       setLoading(true);
       getUserId();
-      await fetchPersonnel();
-      await fetchUserEvaluations();
+      fetchPersonnel();
+      fetchUserEvaluations();
       setLoading(false);
     };
     initializeData();
@@ -277,13 +278,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     return personnel;
   }, [personnel, userEvaluations, selectedGrade]);
 
-  // 清除等级过滤
-  const clearGradeFilter = () => {
-    setSelectedGrade(null);
-  };
-
-  // 获取等级统计
-  const getGradeStatistics = () => {
+  // 使用useMemo缓存等级统计
+  const gradeStatistics = useMemo(() => {
     const stats = {};
     const gradeDetails = getGradeDetails();
 
@@ -306,7 +302,25 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     });
 
     return stats;
+  }, [userEvaluations]);
+
+  // 使用useMemo缓存等级分布验证
+  const gradeValidation = useMemo(() => {
+    return validateGradeDistribution(userEvaluations, department);
+  }, [userEvaluations, department]);
+
+  // 使用useMemo缓存部门分布限制
+  const departmentLimits = useMemo(() => {
+    return getDepartmentDistributionLimits(department);
+  }, [department]);
+
+  // 清除等级过滤
+  const clearGradeFilter = () => {
+    setSelectedGrade(null);
   };
+
+  // 获取等级统计
+  const getGradeStatistics = () => gradeStatistics;
 
   // 动态获取部门等级分布要求文案
   const getDepartmentDistributionText = (dept) => {
@@ -391,65 +405,61 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           </div>
 
           {/* 本地存储状态提示 */}
-          {(() => {
-            const localEvaluations = loadEvaluationsFromLocal();
-            const localCount = Object.keys(localEvaluations).length;
-            if (localCount > 0) {
-              return (
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="pt-6">
-                    <div className="text-sm text-blue-800">
-                      <div className="font-medium mb-1">本地评价状态</div>
-                      <div>已保存 {localCount} 个评价到本地存储</div>
-                      <div className="text-xs mt-1">
-                        所有评价数据都保存在本地浏览器中
-                      </div>
+          {Object.keys(userEvaluations).length > 0 && (
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-6">
+                <div className="text-sm text-blue-800">
+                  <div className="font-medium mb-1">本地评价状态</div>
+                  <div>
+                    已保存 {Object.keys(userEvaluations).length}{" "}
+                    个评价到本地存储
+                  </div>
+                  <div className="text-xs mt-1">
+                    所有评价数据都保存在本地浏览器中
+                  </div>
 
-                      <div className="mt-3">
-                        <Dialog
-                          open={clearAllDialogOpen}
-                          onOpenChange={setClearAllDialogOpen}
-                        >
-                          <DialogTrigger asChild>
-                            <Button variant="destructive" size="sm">
-                              <TrashIcon className="w-4 h-4 mr-2" />
-                              清空所有评价数据
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle className="flex items-center gap-2">
-                                <AlertTriangleIcon className="w-5 h-5 text-red-500" />
-                                确认清空所有评价数据
-                              </DialogTitle>
-                              <DialogDescription>
-                                此操作将删除您所有的评价记录，且无法恢复。确定要继续吗？
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter>
-                              <Button
-                                variant="outline"
-                                onClick={() => setClearAllDialogOpen(false)}
-                              >
-                                取消
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                onClick={clearAllEvaluations}
-                              >
-                                确认清空
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            }
-            return null;
-          })()}
+                  <div className="mt-3">
+                    <Dialog
+                      open={clearAllDialogOpen}
+                      onOpenChange={setClearAllDialogOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          <TrashIcon className="w-4 h-4 mr-2" />
+                          清空所有评价数据
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangleIcon className="w-5 h-5 text-red-500" />
+                            确认清空所有评价数据
+                          </DialogTitle>
+                          <DialogDescription>
+                            此操作将删除您所有的评价记录，且无法恢复。确定要继续吗？
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => setClearAllDialogOpen(false)}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={clearAllEvaluations}
+                          >
+                            确认清空
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 人员统计和等级分布状态 */}
           <div className="space-y-4">
@@ -459,10 +469,10 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={async () => {
+                onClick={() => {
                   setLoading(true);
-                  await fetchPersonnel();
-                  await fetchUserEvaluations();
+                  fetchPersonnel();
+                  fetchUserEvaluations();
                   setLoading(false);
                 }}
               >
@@ -552,8 +562,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                     {/* 当前分布统计 */}
                     <div className="grid grid-cols-5 gap-2 text-center">
                       {getGradeDetails().map((grade) => {
-                        const stats = getGradeStatistics();
-                        const gradeStats = stats[grade.letter];
+                        const gradeStats = gradeStatistics[grade.letter];
                         return (
                           <div
                             key={grade.letter}
@@ -577,107 +586,83 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                         <div className="flex justify-between">
                           <span>A等级（优秀）：</span>
                           <span
-                            className={(() => {
-                              const stats = getGradeStatistics();
-                              const limits =
-                                getDepartmentDistributionLimits(department);
-                              return stats.A.count <= limits.A.max
+                            className={
+                              gradeStatistics.A.count <= departmentLimits.A.max
                                 ? "text-green-600"
-                                : "text-red-600";
-                            })()}
+                                : "text-red-600"
+                            }
                           >
-                            {getGradeStatistics().A.count}人 /{" "}
-                            {getDepartmentDistributionLimits(department).A.text}
+                            {gradeStatistics.A.count}人 /{" "}
+                            {departmentLimits.A.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span>B等级（良好）：</span>
                           <span
-                            className={(() => {
-                              const stats = getGradeStatistics();
-                              const limits =
-                                getDepartmentDistributionLimits(department);
-                              const bCount = stats.B.count;
-                              return bCount >= limits.B.min &&
-                                bCount <= limits.B.max
+                            className={
+                              gradeStatistics.B.count >=
+                                departmentLimits.B.min &&
+                              gradeStatistics.B.count <= departmentLimits.B.max
                                 ? "text-green-600"
-                                : "text-red-600";
-                            })()}
+                                : "text-red-600"
+                            }
                           >
-                            {getGradeStatistics().B.count}人 /{" "}
-                            {getDepartmentDistributionLimits(department).B.text}
+                            {gradeStatistics.B.count}人 /{" "}
+                            {departmentLimits.B.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span>C等级（合格）：</span>
                           <span
-                            className={(() => {
-                              const stats = getGradeStatistics();
-                              const limits =
-                                getDepartmentDistributionLimits(department);
-                              const cCount = stats.C.count;
-                              return cCount >= limits.C.min &&
-                                cCount <= limits.C.max
+                            className={
+                              gradeStatistics.C.count >=
+                                departmentLimits.C.min &&
+                              gradeStatistics.C.count <= departmentLimits.C.max
                                 ? "text-green-600"
-                                : "text-red-600";
-                            })()}
+                                : "text-red-600"
+                            }
                           >
-                            {getGradeStatistics().C.count}人 /{" "}
-                            {getDepartmentDistributionLimits(department).C.text}
+                            {gradeStatistics.C.count}人 /{" "}
+                            {departmentLimits.C.text}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span>D+E等级（基本合格+不合格）：</span>
                           <span
-                            className={(() => {
-                              const stats = getGradeStatistics();
-                              const limits =
-                                getDepartmentDistributionLimits(department);
-                              const deCount = stats.D.count + stats.E.count;
-                              return deCount >= limits.DE.min &&
-                                deCount <= limits.DE.max
+                            className={
+                              gradeStatistics.D.count +
+                                gradeStatistics.E.count >=
+                                departmentLimits.DE.min &&
+                              gradeStatistics.D.count +
+                                gradeStatistics.E.count <=
+                                departmentLimits.DE.max
                                 ? "text-green-600"
-                                : "text-red-600";
-                            })()}
-                          >
-                            {getGradeStatistics().D.count +
-                              getGradeStatistics().E.count}
-                            人 /{" "}
-                            {
-                              getDepartmentDistributionLimits(department).DE
-                                .text
+                                : "text-red-600"
                             }
+                          >
+                            {gradeStatistics.D.count + gradeStatistics.E.count}
+                            人 / {departmentLimits.DE.text}
                           </span>
                         </div>
                       </div>
                     </div>
 
                     {/* 调整建议 */}
-                    {(() => {
-                      const validation = validateGradeDistribution(
-                        userEvaluations,
-                        department
-                      );
-                      if (!validation.valid) {
-                        const suggestions = getGradeDistributionSuggestions(
-                          userEvaluations,
-                          department
-                        );
-                        return (
-                          <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                            <div className="font-medium text-yellow-800 mb-2">
-                              调整建议：
-                            </div>
-                            <div className="space-y-1 text-sm text-yellow-700">
-                              {suggestions.map((suggestion, index) => (
-                                <div key={index}>• {suggestion.message}</div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+                    {!gradeValidation.valid && (
+                      <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                        <div className="font-medium text-yellow-800 mb-2">
+                          调整建议：
+                        </div>
+                        <div className="space-y-1 text-sm text-yellow-700">
+                          {getGradeDistributionSuggestions(
+                            userEvaluations,
+                            department
+                          ).map((suggestion, index) => (
+                            <div key={index}>• {suggestion.message}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
