@@ -2,10 +2,13 @@
 
 // 身份证号验证函数
 export const validateIdCard = (idCard) => {
+  // 转换为大写以便不区分大小写
+  const upperIdCard = idCard.toUpperCase();
+
   // 基本格式验证：18位数字，最后一位可以是X
   const idCardRegex =
     /^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/;
-  if (!idCardRegex.test(idCard)) {
+  if (!idCardRegex.test(upperIdCard)) {
     return false;
   }
 
@@ -15,11 +18,11 @@ export const validateIdCard = (idCard) => {
 
   let sum = 0;
   for (let i = 0; i < 17; i++) {
-    sum += parseInt(idCard[i]) * weights[i];
+    sum += parseInt(upperIdCard[i]) * weights[i];
   }
 
   const checkCode = checkCodes[sum % 11];
-  return idCard[17].toUpperCase() === checkCode;
+  return upperIdCard[17] === checkCode;
 };
 
 // 根据姓名和身份证号获取人员信息的函数

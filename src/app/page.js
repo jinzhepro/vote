@@ -118,8 +118,8 @@ export default function Home() {
                   id="idCard"
                   type="text"
                   value={idCard}
-                  onChange={(e) => setIdCard(e.target.value)}
-                  placeholder="请输入您的身份证号"
+                  onChange={(e) => setIdCard(e.target.value.toUpperCase())}
+                  placeholder="请输入您的身份证号（不区分大小写）"
                   className="w-full"
                   disabled={loading}
                   maxLength={18}
