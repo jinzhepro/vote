@@ -512,9 +512,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -536,9 +533,6 @@ export function AdminDashboard() {
                                             {userId}
                                           </div>
                                         </div>
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        职能部门
                                       </td>
                                     </tr>
                                   ))}
@@ -580,9 +574,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -604,9 +595,6 @@ export function AdminDashboard() {
                                             {userId}
                                           </div>
                                         </div>
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        经控贸易
                                       </td>
                                     </tr>
                                   ))}
@@ -655,9 +643,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -679,9 +664,6 @@ export function AdminDashboard() {
                                             {userId}
                                           </div>
                                         </div>
-                                      </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        开投贸易
                                       </td>
                                     </tr>
                                   ))}
@@ -723,9 +705,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -747,9 +726,6 @@ export function AdminDashboard() {
                                             {userId}
                                           </div>
                                         </div>
-                                      </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        职能部门
                                       </td>
                                     </tr>
                                   ))}
@@ -799,9 +775,6 @@ export function AdminDashboard() {
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
-                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -832,9 +805,6 @@ export function AdminDashboard() {
                                               {userId}
                                             </div>
                                           </div>
-                                        </td>
-                                        <td className="border border-blue-200 px-4 py-2 text-sm">
-                                          经控贸易
                                         </td>
                                       </tr>
                                     );
@@ -874,9 +844,6 @@ export function AdminDashboard() {
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
-                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  部门
-                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -906,9 +873,6 @@ export function AdminDashboard() {
                                               {userId}
                                             </div>
                                           </div>
-                                        </td>
-                                        <td className="border border-green-200 px-4 py-2 text-sm">
-                                          开投贸易
                                         </td>
                                       </tr>
                                     );
