@@ -85,13 +85,16 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
 
       // 转换数据格式以匹配组件期望的格式
       Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
-        evaluationsData[personId] = {
-          evaluations: evaluation.scores,
-          totalScore: evaluation.totalScore,
-          timestamp: evaluation.timestamp,
-          userId: currentUserId,
-          isFromServer: false, // 标记为本地数据
-        };
+        // 只加载当前部门的评价数据
+        if (evaluation.department === department) {
+          evaluationsData[personId] = {
+            evaluations: evaluation.scores,
+            totalScore: evaluation.totalScore,
+            timestamp: evaluation.timestamp,
+            userId: currentUserId,
+            isFromServer: false, // 标记为本地数据
+          };
+        }
       });
 
       return evaluationsData;
@@ -117,7 +120,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     }
   };
 
-  // 清空所有评价数据
+  // 清空当前部门的评价数据
   const clearAllEvaluations = () => {
     if (typeof window === "undefined") return;
 
@@ -128,18 +131,31 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       localStorage.getItem("localEvaluations") || "{}"
     );
 
-    // 创建新的 localEvaluations，删除所有数据
-    const newLocalEvaluations = {};
+    // 保留其他部门的评价数据，只清空当前部门的数据
+    if (localEvaluations[currentUserId]) {
+      const userData = localEvaluations[currentUserId];
+      const newEvaluations = {};
 
-    localStorage.setItem(
-      "localEvaluations",
-      JSON.stringify(newLocalEvaluations)
-    );
-    setUserEvaluations({});
+      // 只保留非当前部门的评价数据
+      Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
+        if (evaluation.department !== department) {
+          newEvaluations[personId] = evaluation;
+        }
+      });
+
+      // 更新用户数据
+      localEvaluations[currentUserId].evaluations = newEvaluations;
+    }
+
+    localStorage.setItem("localEvaluations", JSON.stringify(localEvaluations));
+
+    // 重新加载当前部门的评价数据
+    const updatedEvaluations = loadEvaluationsFromLocal();
+    setUserEvaluations(updatedEvaluations);
     setClearAllDialogOpen(false);
   };
 
-  // 提交所有评价到服务器
+  // 提交当前部门的评价到服务器
   const submitAllEvaluations = async () => {
     if (typeof window === "undefined") return;
 
@@ -156,11 +172,19 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     }
 
     const userData = localEvaluations[currentUserId];
-    const evaluations = userData.evaluations;
-    const evaluationIds = Object.keys(evaluations);
+
+    // 只获取当前部门的评价数据
+    const currentDepartmentEvaluations = {};
+    Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
+      if (evaluation.department === department) {
+        currentDepartmentEvaluations[personId] = evaluation;
+      }
+    });
+
+    const evaluationIds = Object.keys(currentDepartmentEvaluations);
 
     if (evaluationIds.length === 0) {
-      toast.error("没有需要提交的评价");
+      toast.error(`没有需要提交的${getDepartmentName()}评价`);
       return;
     }
 
@@ -179,14 +203,14 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
         localStorage.getItem("completedDepartments") || "[]"
       );
 
-      // 准备基于用户存储的数据
+      // 准备基于用户存储的数据 - 只包含当前部门的评价
       const userEvaluationData = {
         userId: currentUserId,
         userName: userName,
         userRole:
           role === "functional" ? "functional" : userData.role || "employee",
         userDepartment: department,
-        evaluations: evaluations,
+        evaluations: currentDepartmentEvaluations,
         completedDepartments: completedDepartments,
         totalEvaluations: evaluationIds.length,
         isSubmitted: true,
@@ -215,16 +239,24 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
           }
         }
 
-        // 提交成功后清空本地评价数据
+        // 提交成功后只清空当前部门的本地评价数据
         if (localEvaluations[currentUserId]) {
-          localEvaluations[currentUserId].evaluations = {};
+          const newEvaluations = {};
+          Object.entries(userData.evaluations).forEach(
+            ([personId, evaluation]) => {
+              if (evaluation.department !== department) {
+                newEvaluations[personId] = evaluation;
+              }
+            }
+          );
+          localEvaluations[currentUserId].evaluations = newEvaluations;
           localStorage.setItem(
             "localEvaluations",
             JSON.stringify(localEvaluations)
           );
         }
 
-        toast.success(result.message || "所有评价提交成功！");
+        toast.success(result.message || `${getDepartmentName()}评价提交成功！`);
         // 跳转到成功页面
         router.push("/vote/success");
       } else {
@@ -310,17 +342,21 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
       };
     });
 
-    // 统计已评价人员的等级
-    Object.values(userEvaluations).forEach((evaluation) => {
-      const grade = getScoreGrade(evaluation.totalScore);
-      if (stats[grade.letter]) {
-        stats[grade.letter].count++;
-        stats[grade.letter].evaluatedCount++;
+    // 统计已评价人员的等级 - 只统计当前部门的人员
+    Object.entries(userEvaluations).forEach(([personId, evaluation]) => {
+      // 确保只统计当前部门的人员
+      const person = personnel.find((p) => p.id === personId);
+      if (person) {
+        const grade = getScoreGrade(evaluation.totalScore);
+        if (stats[grade.letter]) {
+          stats[grade.letter].count++;
+          stats[grade.letter].evaluatedCount++;
+        }
       }
     });
 
     return stats;
-  }, [userEvaluations]);
+  }, [userEvaluations, personnel]);
 
   // 使用useMemo缓存等级分布验证
   const gradeValidation = useMemo(() => {
@@ -452,17 +488,18 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                       <DialogTrigger asChild>
                         <Button variant="destructive" size="sm">
                           <TrashIcon className="w-4 h-4 mr-2" />
-                          清空所有评价数据
+                          清空本部门评价数据
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
                             <AlertTriangleIcon className="w-5 h-5 text-red-500" />
-                            确认清空所有评价数据
+                            确认清空本部门评价数据
                           </DialogTitle>
                           <DialogDescription>
-                            此操作将删除您所有的评价记录，且无法恢复。确定要继续吗？
+                            此操作将删除您在{getDepartmentName()}
+                            的所有评价记录，其他部门的评价数据将保留。确定要继续吗？
                           </DialogDescription>
                         </DialogHeader>
                         <DialogFooter>

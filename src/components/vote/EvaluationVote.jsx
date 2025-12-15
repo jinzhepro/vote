@@ -173,13 +173,16 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
       // 转换数据格式以匹配组件期望的格式
       Object.entries(userData.evaluations).forEach(([personId, evaluation]) => {
-        evaluationsData[personId] = {
-          evaluations: evaluation.scores,
-          totalScore: evaluation.totalScore,
-          timestamp: evaluation.timestamp,
-          userId: currentDeviceId,
-          isFromServer: false, // 标记为本地数据
-        };
+        // 只加载当前部门的评价数据
+        if (evaluation.department === department) {
+          evaluationsData[personId] = {
+            evaluations: evaluation.scores,
+            totalScore: evaluation.totalScore,
+            timestamp: evaluation.timestamp,
+            userId: currentDeviceId,
+            isFromServer: false, // 标记为本地数据
+          };
+        }
       });
 
       return evaluationsData;
@@ -188,7 +191,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     return {};
   };
 
-  // 批量提交本地存储的所有评价（调用API）
+  // 批量提交本地存储的当前部门评价（调用API）
   const submitAllLocalEvaluations = async () => {
     const currentDeviceId = userId || initializeDeviceId();
     const localEvaluations = JSON.parse(
@@ -200,11 +203,24 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
 
     const userData = localEvaluations[currentDeviceId];
-    const evaluations = userData.evaluations;
-    const evaluationIds = Object.keys(evaluations);
+
+    // 只获取当前部门的评价数据
+    const currentDepartmentEvaluations = {};
+    Object.entries(userData.evaluations).forEach(
+      ([personnelId, evaluation]) => {
+        if (evaluation.department === department) {
+          currentDepartmentEvaluations[personnelId] = evaluation;
+        }
+      }
+    );
+
+    const evaluationIds = Object.keys(currentDepartmentEvaluations);
 
     if (evaluationIds.length === 0) {
-      return { success: true, message: "没有需要提交的评价" };
+      return {
+        success: true,
+        message: `没有需要提交的${getDepartmentName()}评价`,
+      };
     }
 
     try {
@@ -214,14 +230,16 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
       // 准备提交到新API的数据格式
       const evaluationsData = {};
-      Object.entries(evaluations).forEach(([personnelId, evaluation]) => {
-        evaluationsData[personnelId] = {
-          personnel_id: personnelId,
-          scores: evaluation.scores,
-          totalScore: evaluation.totalScore,
-          timestamp: evaluation.timestamp,
-        };
-      });
+      Object.entries(currentDepartmentEvaluations).forEach(
+        ([personnelId, evaluation]) => {
+          evaluationsData[personnelId] = {
+            personnel_id: personnelId,
+            scores: evaluation.scores,
+            totalScore: evaluation.totalScore,
+            timestamp: evaluation.timestamp,
+          };
+        }
+      );
 
       // 获取已完成的部门
       const completedDepartments = JSON.parse(
@@ -260,9 +278,17 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
           }
         }
 
-        // 提交成功后清空本地评价数据
+        // 提交成功后只清空当前部门的本地评价数据
         if (localEvaluations[currentDeviceId]) {
-          localEvaluations[currentDeviceId].evaluations = {};
+          const newEvaluations = {};
+          Object.entries(userData.evaluations).forEach(
+            ([personnelId, evaluation]) => {
+              if (evaluation.department !== department) {
+                newEvaluations[personnelId] = evaluation;
+              }
+            }
+          );
+          localEvaluations[currentDeviceId].evaluations = newEvaluations;
           localStorage.setItem(
             "localEvaluations",
             JSON.stringify(localEvaluations)
@@ -271,7 +297,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
 
         return {
           success: true,
-          message: result.message || "评价提交成功",
+          message: result.message || `${getDepartmentName()}评价提交成功`,
           data: result.data,
         };
       } else {
@@ -527,7 +553,7 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
     }
   };
 
-  // 提交所有评价
+  // 提交当前部门的所有评价
   const submitAllEvaluations = async () => {
     // 检查是否所有评分标准都已选择
     const requiredCriteria = Object.keys(criteria);
@@ -587,17 +613,17 @@ export function EvaluationVote({ department, onBack, initialPersonId }) {
         }
       }
 
-      // 显示全屏loading并保存所有本地存储的评价
+      // 显示全屏loading并保存当前部门的所有本地存储评价
       setSubmitting(true);
       const result = await submitAllLocalEvaluations();
 
       if (result.success) {
-        toast.success(`所有评价提交成功！${result.message}`);
+        toast.success(`${getDepartmentName()}评价提交成功！${result.message}`);
         // 直接跳转到成功页面
         window.location.href = `/vote/success`;
       } else {
         toast.error(`评价提交失败：${result.message}`);
-        if (result.errors.length > 0) {
+        if (result.errors && result.errors.length > 0) {
           console.error("提交错误:", result.errors);
         }
       }
