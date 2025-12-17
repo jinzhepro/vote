@@ -117,8 +117,23 @@ export default function Home() {
             </p>
           </div>
 
+          {/* 隐私保护提示 */}
+          <div className="mt-8 max-w-md mx-auto w-full bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                i
+              </div>
+              <div className="flex-1 text-sm text-blue-800 leading-relaxed">
+                <p className="font-semibold mb-1">隐私保护声明</p>
+                <p>
+                  您输入的姓名和身份证号仅用于身份校验，确保本人操作。这些信息不会上传到服务器，也不会被存储或泄露。
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* 姓名输入表单 */}
-          <div className="mt-12 max-w-md mx-auto w-full">
+          <div className="mt-6 max-w-md mx-auto w-full">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
