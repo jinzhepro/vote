@@ -123,123 +123,6 @@ export function AdminDashboard() {
     setShowUserDetails(true);
   };
 
-  // 获取人员姓名的函数
-  const getPersonName = (personnelId) => {
-    // 使用本地人员数据查找
-    const {
-      jingkongPersonnel,
-      kaitouPersonnel,
-    } = require("@/data/personnelData");
-
-    // 在经控贸易人员中查找
-    const jingkongPerson = jingkongPersonnel.find(
-      (p) => p.id === personnelId || p.name === personnelId
-    );
-    if (jingkongPerson) return jingkongPerson.name;
-
-    // 在开投贸易人员中查找
-    const kaitouPerson = kaitouPersonnel.find(
-      (p) => p.id === personnelId || p.name === personnelId
-    );
-    if (kaitouPerson) return kaitouPerson.name;
-
-    // 如果找不到，返回原始ID
-    return personnelId;
-  };
-
-  // 尝试通过userId获取用户姓名的函数
-  const getUserNameById = (userId) => {
-    // 检查是否是加密的userId格式（基于姓名生成的）
-    if (userId.includes("_")) {
-      const [prefix, hash] = userId.split("_");
-
-      // 检查是否是有效的部门前缀
-      if (["jingkong", "kaitou", "functional"].includes(prefix)) {
-        // 对于职能部门，从functionalPersonnel中查找
-        if (prefix === "functional") {
-          for (const person of functionalPersonnel) {
-            // 模拟加密过程来匹配
-            const createHash = (str) => {
-              let hash = 0;
-              if (str.length === 0) return hash;
-              for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = (hash << 5) - hash + char;
-                hash = hash & hash;
-              }
-              return Math.abs(hash);
-            };
-
-            const combinedHash = createHash(`${person.name}_functional`);
-            const encryptedId = `functional_${combinedHash}`;
-
-            if (encryptedId === userId) {
-              return person.name;
-            }
-          }
-        }
-
-        // 对于经控贸易和开投贸易，在对应部门人员中查找
-        for (const person of apiJingkongPersonnel) {
-          // 模拟加密过程来匹配
-          const createHash = (str) => {
-            let hash = 0;
-            if (str.length === 0) return hash;
-            for (let i = 0; i < str.length; i++) {
-              const char = str.charCodeAt(i);
-              hash = (hash << 5) - hash + char;
-              hash = hash & hash;
-            }
-            return Math.abs(hash);
-          };
-
-          const department = "jingkong";
-          const combinedHash = createHash(`${person.name}_${department}`);
-          const encryptedId = `${department}_${combinedHash}`;
-
-          if (encryptedId === userId) {
-            return person.name;
-          }
-        }
-
-        for (const person of apiKaitouPersonnel) {
-          // 模拟加密过程来匹配
-          const createHash = (str) => {
-            let hash = 0;
-            if (str.length === 0) return hash;
-            for (let i = 0; i < str.length; i++) {
-              const char = str.charCodeAt(i);
-              hash = (hash << 5) - hash + char;
-              hash = hash & hash;
-            }
-            return Math.abs(hash);
-          };
-
-          const department = "kaitou";
-          const combinedHash = createHash(`${person.name}_${department}`);
-          const encryptedId = `${department}_${combinedHash}`;
-
-          if (encryptedId === userId) {
-            return person.name;
-          }
-        }
-
-        // 如果还是找不到，尝试从localStorage获取
-        const savedNames = JSON.parse(
-          localStorage.getItem("functionalUserNames") || "{}"
-        );
-        for (const [name, savedId] of Object.entries(savedNames)) {
-          if (savedId === userId) {
-            return name;
-          }
-        }
-      }
-    }
-
-    // 如果无法解析，返回userId
-    return userId;
-  };
-
   // 评分标准中文映射
   const criterionNames = {
     responsibility: "责任心",
@@ -264,20 +147,13 @@ export function AdminDashboard() {
       return null;
     }
 
-    // personnel 可能是字符串（名称）或对象（包含 id 和 name）
+    // personnel 可能是字符串（ID）或对象（包含 id）
     const personnelId =
       typeof personnel === "string" ? personnel : personnel.id;
-    const personnelName =
-      typeof personnel === "string" ? personnel : personnel.name;
 
     // 直接从stats.personnel中查找匹配的人员评价数据
     if (stats.personnel[personnelId]) {
       return stats.personnel[personnelId];
-    }
-
-    // 尝试用名称查找
-    if (stats.personnel[personnelName]) {
-      return stats.personnel[personnelName];
     }
 
     return null;
@@ -314,11 +190,14 @@ export function AdminDashboard() {
       return;
     }
 
-    const personnelColumns = departmentPersonnel.map((p) => p.name);
+    const personnelColumns = departmentPersonnel.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
     console.log("人员列:", personnelColumns);
 
-    // 表头：各列为被评价人员姓名（删除评价人列）
-    const header = [...personnelColumns];
+    // 表头：第一列为评价人ID，后面各列为被评价人员姓名
+    const header = ["评价人ID", ...personnelColumns.map((p) => p.name)];
     const sheetData = [header];
 
     let filteredUsers;
@@ -343,23 +222,23 @@ export function AdminDashboard() {
       return;
     }
 
-    // 为每个用户创建一行数据（删除评价人列）
+    // 为每个用户创建一行数据（第一列为评价人ID）
     filteredUsers.forEach(([userId, userStats]) => {
-      const row = []; // 删除评价人ID列
+      const row = [userId]; // 第一列为评价人ID
 
       // 为每个被评价人员查找该用户的评分
-      personnelColumns.forEach((personName) => {
-        const person = departmentPersonnel.find((p) => p.name === personName);
-        if (person) {
-          const evaluation = getPersonnelEvaluations(person);
-          console.log(`人员 ${personName} 的评价数据:`, evaluation);
+      personnelColumns.forEach((person) => {
+        const personData = departmentPersonnel.find((p) => p.id === person.id);
+        if (personData) {
+          const evaluation = getPersonnelEvaluations(personData);
+          console.log(`人员 ${person.id} 的评价数据:`, evaluation);
 
           if (evaluation && evaluation.evaluations) {
             const userEvaluation = evaluation.evaluations.find(
               (e) => e.userRole === role && e.userId === userId
             );
             console.log(
-              `用户 ${userId} 对 ${personName} 的评价:`,
+              `用户 ${userId} 对 ${person.id} 的评价:`,
               userEvaluation
             );
             row.push(userEvaluation ? userEvaluation.totalScore : "");
@@ -374,12 +253,12 @@ export function AdminDashboard() {
       sheetData.push(row);
     });
 
-    // 添加平均值行（删除平均值列头）
-    const averageRow = [];
-    personnelColumns.forEach((personName) => {
-      const person = departmentPersonnel.find((p) => p.name === personName);
-      if (person) {
-        const evaluation = getPersonnelEvaluations(person);
+    // 添加平均值行（第一列留空）
+    const averageRow = ["平均值"];
+    personnelColumns.forEach((person) => {
+      const personData = departmentPersonnel.find((p) => p.id === person.id);
+      if (personData) {
+        const evaluation = getPersonnelEvaluations(personData);
         const roleEvaluations = evaluation?.evaluations?.filter(
           (e) => e.userRole === role
         );
@@ -513,7 +392,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -530,15 +409,8 @@ export function AdminDashboard() {
                                       <td className="border border-blue-200 px-4 py-2 text-sm text-center">
                                         {index + 1}
                                       </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        <div>
-                                          <div className="font-medium">
-                                            {getUserNameById(userId)}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {userId}
-                                          </div>
-                                        </div>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm font-mono">
+                                        {userId}
                                       </td>
                                     </tr>
                                   ))}
@@ -581,7 +453,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -598,15 +470,8 @@ export function AdminDashboard() {
                                       <td className="border border-green-200 px-4 py-2 text-sm text-center">
                                         {index + 1}
                                       </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        <div>
-                                          <div className="font-medium">
-                                            {getUserNameById(userId)}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {userId}
-                                          </div>
-                                        </div>
+                                      <td className="border border-green-200 px-4 py-2 text-sm font-mono">
+                                        {userId}
                                       </td>
                                     </tr>
                                   ))}
@@ -656,7 +521,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -673,15 +538,8 @@ export function AdminDashboard() {
                                       <td className="border border-blue-200 px-4 py-2 text-sm text-center">
                                         {index + 1}
                                       </td>
-                                      <td className="border border-blue-200 px-4 py-2 text-sm">
-                                        <div>
-                                          <div className="font-medium">
-                                            {getUserNameById(userId)}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {userId}
-                                          </div>
-                                        </div>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm font-mono">
+                                        {userId}
                                       </td>
                                     </tr>
                                   ))}
@@ -724,7 +582,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -741,15 +599,8 @@ export function AdminDashboard() {
                                       <td className="border border-green-200 px-4 py-2 text-sm text-center">
                                         {index + 1}
                                       </td>
-                                      <td className="border border-green-200 px-4 py-2 text-sm">
-                                        <div>
-                                          <div className="font-medium">
-                                            {getUserNameById(userId)}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {userId}
-                                          </div>
-                                        </div>
+                                      <td className="border border-green-200 px-4 py-2 text-sm font-mono">
+                                        {userId}
                                       </td>
                                     </tr>
                                   ))}
@@ -800,7 +651,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -826,15 +677,8 @@ export function AdminDashboard() {
                                         <td className="border border-blue-200 px-4 py-2 text-sm text-center">
                                           {index + 1}
                                         </td>
-                                        <td className="border border-blue-200 px-4 py-2 text-sm">
-                                          <div>
-                                            <div className="font-medium">
-                                              {getUserNameById(userId)}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                              {userId}
-                                            </div>
-                                          </div>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm font-mono">
+                                          {userId}
                                         </td>
                                       </tr>
                                     );
@@ -875,7 +719,7 @@ export function AdminDashboard() {
                                   序号
                                 </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
-                                  用户ID
+                                  投票人ID
                                 </th>
                               </tr>
                             </thead>
@@ -900,15 +744,8 @@ export function AdminDashboard() {
                                         <td className="border border-green-200 px-4 py-2 text-sm text-center">
                                           {index + 1}
                                         </td>
-                                        <td className="border border-green-200 px-4 py-2 text-sm">
-                                          <div>
-                                            <div className="font-medium">
-                                              {getUserNameById(userId)}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                              {userId}
-                                            </div>
-                                          </div>
+                                        <td className="border border-green-200 px-4 py-2 text-sm font-mono">
+                                          {userId}
                                         </td>
                                       </tr>
                                     );
@@ -983,8 +820,8 @@ export function AdminDashboard() {
                     {selectedUserEvaluations.evaluations.map(
                       (evaluation, index) => (
                         <tr key={index} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 px-4 py-2 text-sm">
-                            {getPersonnelName(evaluation.personnel_id)}
+                          <td className="border border-gray-200 px-4 py-2 text-sm font-mono">
+                            {evaluation.personnel_id}
                           </td>
                           <td className="border border-gray-200 px-4 py-2 text-sm font-medium">
                             {evaluation.total_score}分
