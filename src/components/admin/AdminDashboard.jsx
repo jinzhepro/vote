@@ -509,6 +509,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
@@ -522,8 +525,11 @@ export function AdminDashboard() {
                                       user.role === "leader" &&
                                       user.department === "jingkong"
                                   )
-                                  .map(([userId, userStats]) => (
+                                  .map(([userId, userStats], index) => (
                                     <tr key={userId}>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm text-center">
+                                        {index + 1}
+                                      </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         <div>
                                           <div className="font-medium">
@@ -571,6 +577,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
@@ -584,8 +593,11 @@ export function AdminDashboard() {
                                       user.role === "employee" &&
                                       user.department === "jingkong"
                                   )
-                                  .map(([userId, userStats]) => (
+                                  .map(([userId, userStats], index) => (
                                     <tr key={userId}>
+                                      <td className="border border-green-200 px-4 py-2 text-sm text-center">
+                                        {index + 1}
+                                      </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         <div>
                                           <div className="font-medium">
@@ -640,6 +652,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
@@ -653,8 +668,11 @@ export function AdminDashboard() {
                                       user.role === "leader" &&
                                       user.department === "kaitou"
                                   )
-                                  .map(([userId, userStats]) => (
+                                  .map(([userId, userStats], index) => (
                                     <tr key={userId}>
+                                      <td className="border border-blue-200 px-4 py-2 text-sm text-center">
+                                        {index + 1}
+                                      </td>
                                       <td className="border border-blue-200 px-4 py-2 text-sm">
                                         <div>
                                           <div className="font-medium">
@@ -702,6 +720,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
@@ -715,8 +736,11 @@ export function AdminDashboard() {
                                       user.role === "employee" &&
                                       user.department === "kaitou"
                                   )
-                                  .map(([userId, userStats]) => (
+                                  .map(([userId, userStats], index) => (
                                     <tr key={userId}>
+                                      <td className="border border-green-200 px-4 py-2 text-sm text-center">
+                                        {index + 1}
+                                      </td>
                                       <td className="border border-green-200 px-4 py-2 text-sm">
                                         <div>
                                           <div className="font-medium">
@@ -772,6 +796,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-blue-50">
+                                <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-blue-200 px-4 py-2 text-left text-sm font-medium text-blue-800">
                                   用户ID
                                 </th>
@@ -783,7 +810,7 @@ export function AdminDashboard() {
                                   .filter(
                                     ([_, user]) => user.role === "functional"
                                   )
-                                  .map(([userId, userStats]) => {
+                                  .map(([userId, userStats], index) => {
                                     // 将evaluations对象转换为数组
                                     const evaluationsArray =
                                       userStats.evaluations
@@ -796,6 +823,9 @@ export function AdminDashboard() {
 
                                     return (
                                       <tr key={userId}>
+                                        <td className="border border-blue-200 px-4 py-2 text-sm text-center">
+                                          {index + 1}
+                                        </td>
                                         <td className="border border-blue-200 px-4 py-2 text-sm">
                                           <div>
                                             <div className="font-medium">
@@ -841,6 +871,9 @@ export function AdminDashboard() {
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-green-50">
+                                <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800 w-16">
+                                  序号
+                                </th>
                                 <th className="border border-green-200 px-4 py-2 text-left text-sm font-medium text-green-800">
                                   用户ID
                                 </th>
@@ -852,7 +885,7 @@ export function AdminDashboard() {
                                   .filter(
                                     ([_, user]) => user.role === "functional"
                                   )
-                                  .map(([userId, userStats]) => {
+                                  .map(([userId, userStats], index) => {
                                     // 将evaluations对象转换为数组
                                     const evaluationsArray =
                                       userStats.evaluations
@@ -864,6 +897,9 @@ export function AdminDashboard() {
 
                                     return (
                                       <tr key={userId}>
+                                        <td className="border border-green-200 px-4 py-2 text-sm text-center">
+                                          {index + 1}
+                                        </td>
                                         <td className="border border-green-200 px-4 py-2 text-sm">
                                           <div>
                                             <div className="font-medium">
