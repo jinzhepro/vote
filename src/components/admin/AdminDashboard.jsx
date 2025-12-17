@@ -317,8 +317,8 @@ export function AdminDashboard() {
     const personnelColumns = departmentPersonnel.map((p) => p.name);
     console.log("人员列:", personnelColumns);
 
-    // 表头：第一列为"评价人"，后面各列为被评价人员姓名
-    const header = ["评价人", ...personnelColumns];
+    // 表头：各列为被评价人员姓名（删除评价人列）
+    const header = [...personnelColumns];
     const sheetData = [header];
 
     let filteredUsers;
@@ -343,9 +343,9 @@ export function AdminDashboard() {
       return;
     }
 
-    // 为每个用户创建一行数据
+    // 为每个用户创建一行数据（删除评价人列）
     filteredUsers.forEach(([userId, userStats]) => {
-      const row = [userId]; // 第一列是评价人ID
+      const row = []; // 删除评价人ID列
 
       // 为每个被评价人员查找该用户的评分
       personnelColumns.forEach((personName) => {
@@ -374,8 +374,8 @@ export function AdminDashboard() {
       sheetData.push(row);
     });
 
-    // 添加平均值行
-    const averageRow = ["平均值"];
+    // 添加平均值行（删除平均值列头）
+    const averageRow = [];
     personnelColumns.forEach((personName) => {
       const person = departmentPersonnel.find((p) => p.name === personName);
       if (person) {
