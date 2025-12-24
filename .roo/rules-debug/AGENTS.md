@@ -41,7 +41,7 @@ This file provides guidance to agents when working with code in this repository.
 
 - **经控贸易**：55 人，等级分布 A≤11, B=23-26, C=18-21, D+E=3-6
 - **开投贸易**：23 人，等级分布 A≤4, B=9-11, C=6-8, D+E=1-3
-- **职能部门**：5 人，需要评价多个部门，使用 `completedDepartments` 跟踪进度
+- **职能部门**：5 人，无等级分布要求，需要评价多个部门，使用 `completedDepartments` 跟踪进度
 
 ### 性能监控
 

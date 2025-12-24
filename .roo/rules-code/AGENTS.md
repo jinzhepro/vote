@@ -22,6 +22,7 @@ This file provides guidance to agents when working with code in this repository.
 - **分布要求**：
   - 经控贸易：A≤11 人，B=23-26 人，C=18-21 人，D+E=3-6 人
   - 开投贸易：A≤4 人，B=9-11 人，C=6-8 人，D+E=1-3 人
+  - 职能部门：无等级分布要求
 - **验证失败处理**：必须显示详细错误信息和调整建议，使用 `getGradeDistributionSuggestions()`
 
 ### 组件开发规范

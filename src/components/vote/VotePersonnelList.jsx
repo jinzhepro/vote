@@ -370,7 +370,7 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
     } else if (dept === "kaitou") {
       return "开投贸易部门等级分布要求：A优秀≤4人，B良好=9-11人，C合格=6-8人，D基本合格+E不合格=1-3人";
     } else {
-      return "职能部门等级分布要求：A优秀≤1人，B良好=2-3人，C合格=1-2人，D基本合格+E不合格=0-1人";
+      return "职能部门无等级分布要求";
     }
   };
 
@@ -391,12 +391,8 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
         DE: { min: 1, max: 3, text: "1-3人" },
       };
     } else {
-      return {
-        A: { max: 1, text: "≤1人" },
-        B: { min: 2, max: 3, text: "2-3人" },
-        C: { min: 1, max: 2, text: "1-2人" },
-        DE: { min: 0, max: 1, text: "0-1人" },
-      };
+      // 职能部门无等级分布要求，返回空对象
+      return {};
     }
   };
 
@@ -625,72 +621,78 @@ export function VotePersonnelList({ department, role = "employee", onBack }) {
                     </div>
 
                     {/* 分布要求对比 */}
-                    <div className="bg-white p-3 rounded border text-sm">
-                      <div className="font-medium mb-2">分布要求对比：</div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span>A等级（优秀）：</span>
-                          <span
-                            className={
-                              gradeStatistics.A.count <= departmentLimits.A.max
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {gradeStatistics.A.count}人 /{" "}
-                            {departmentLimits.A.text}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>B等级（良好）：</span>
-                          <span
-                            className={
-                              gradeStatistics.B.count >=
-                                departmentLimits.B.min &&
-                              gradeStatistics.B.count <= departmentLimits.B.max
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {gradeStatistics.B.count}人 /{" "}
-                            {departmentLimits.B.text}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>C等级（合格）：</span>
-                          <span
-                            className={
-                              gradeStatistics.C.count >=
-                                departmentLimits.C.min &&
-                              gradeStatistics.C.count <= departmentLimits.C.max
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {gradeStatistics.C.count}人 /{" "}
-                            {departmentLimits.C.text}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>D+E等级（基本合格+不合格）：</span>
-                          <span
-                            className={
-                              gradeStatistics.D.count +
-                                gradeStatistics.E.count >=
-                                departmentLimits.DE.min &&
-                              gradeStatistics.D.count +
-                                gradeStatistics.E.count <=
-                                departmentLimits.DE.max
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {gradeStatistics.D.count + gradeStatistics.E.count}
-                            人 / {departmentLimits.DE.text}
-                          </span>
+                    {departmentLimits.A && (
+                      <div className="bg-white p-3 rounded border text-sm">
+                        <div className="font-medium mb-2">分布要求对比：</div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span>A等级（优秀）：</span>
+                            <span
+                              className={
+                                gradeStatistics.A.count <=
+                                departmentLimits.A.max
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {gradeStatistics.A.count}人 /{" "}
+                              {departmentLimits.A.text}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>B等级（良好）：</span>
+                            <span
+                              className={
+                                gradeStatistics.B.count >=
+                                  departmentLimits.B.min &&
+                                gradeStatistics.B.count <=
+                                  departmentLimits.B.max
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {gradeStatistics.B.count}人 /{" "}
+                              {departmentLimits.B.text}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>C等级（合格）：</span>
+                            <span
+                              className={
+                                gradeStatistics.C.count >=
+                                  departmentLimits.C.min &&
+                                gradeStatistics.C.count <=
+                                  departmentLimits.C.max
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {gradeStatistics.C.count}人 /{" "}
+                              {departmentLimits.C.text}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>D+E等级（基本合格+不合格）：</span>
+                            <span
+                              className={
+                                gradeStatistics.D.count +
+                                  gradeStatistics.E.count >=
+                                  departmentLimits.DE.min &&
+                                gradeStatistics.D.count +
+                                  gradeStatistics.E.count <=
+                                  departmentLimits.DE.max
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {gradeStatistics.D.count +
+                                gradeStatistics.E.count}
+                              人 / {departmentLimits.DE.text}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* 调整建议 */}
                     {!gradeValidation.valid && (
